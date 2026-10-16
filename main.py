@@ -50,6 +50,21 @@ LIBRARY_CSS = """
     padding: 8px;
     transition: transform 140ms ease, box-shadow 140ms ease;
 }
+.book-add-card {
+    min-width: 140px;
+    min-height: 256px;
+    padding: 0;
+    border: 1px dotted rgba(255, 255, 255, 0.32);
+    border-radius: 12px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.68);
+    transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.book-add-card:hover {
+    border-color: #62a0ea;
+    background: rgba(98, 160, 234, 0.08);
+    color: #62a0ea;
+}
 .book-card button.flat,
 .book-cover-frame {
     background: transparent;
@@ -278,7 +293,20 @@ class ReaditWindow(Adw.ApplicationWindow):
             card = self._create_book_card(book)
             self.flowbox.append(card)
 
+        self.flowbox.append(self._create_add_book_card())
         self.lib_stack.set_visible_child_name("grid")
+
+    def _create_add_book_card(self) -> Gtk.Widget:
+        button = Gtk.Button()
+        button.add_css_class("book-add-card")
+        button.set_size_request(140, 256)
+        button.set_tooltip_text("Add a book")
+        button.connect("clicked", self._on_add_book_clicked)
+
+        plus_icon = Gtk.Image.new_from_icon_name("list-add-symbolic")
+        plus_icon.set_pixel_size(32)
+        button.set_child(plus_icon)
+        return button
 
     def _create_book_card(self, book: dict) -> Gtk.Widget:
         card_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
