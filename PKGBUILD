@@ -1,10 +1,10 @@
-# Maintainer: Readit Readit
+# Maintainer: voz Readit
 pkgname=readit
 pkgver=1.0.0
 pkgrel=1
 pkgdesc="Distraction-free reflowable PDF book reader for GNOME Wayland"
 arch=('any')
-url="https://github.com/talhakhalid/Readit"
+url="https://github.com/vozzxp/Readit"
 license=('MIT')
 depends=('python' 'python-gobject' 'gtk4' 'libadwaita' 'webkitgtk-6.0' 'python-pymupdf')
 optdepends=(
@@ -24,15 +24,16 @@ package() {
   install -m644 "$startdir/assets/reader.html" "$pkgdir/usr/lib/readit/assets/reader.html"
   install -m644 "$startdir/assets/reader.css" "$pkgdir/usr/lib/readit/assets/reader.css"
   install -m644 "$startdir/assets/reader.js" "$pkgdir/usr/lib/readit/assets/reader.js"
+  install -m644 "$startdir/assets/logo-header.svg" "$pkgdir/usr/lib/readit/assets/logo-header.svg"
 
   if [ -f "$startdir/assets/logo.svg" ]; then
     install -m644 "$startdir/assets/logo.svg" "$pkgdir/usr/lib/readit/assets/logo.svg"
     install -Dm644 "$startdir/assets/logo.svg" \
-      "$pkgdir/usr/share/icons/hicolor/scalable/apps/org.Readit.Readit.svg"
+      "$pkgdir/usr/share/icons/hicolor/scalable/apps/org.voz.Readit.svg"
   fi
 
-  install -Dm644 "$startdir/packaging/org.Readit.Readit.desktop" \
-    "$pkgdir/usr/share/applications/org.Readit.Readit.desktop"
+  install -Dm644 "$startdir/packaging/org.voz.Readit.desktop" \
+    "$pkgdir/usr/share/applications/org.voz.Readit.desktop"
 
   cat > "$pkgdir/usr/bin/readit" << 'EOF'
 #!/usr/bin/env bash

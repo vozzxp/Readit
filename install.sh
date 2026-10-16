@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_ID="org.Readit.Readit"
+APP_ID="org.voz.Readit"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="$HOME/.local/share/readit-app"
 BIN_DIR="$HOME/.local/bin"

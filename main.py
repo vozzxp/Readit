@@ -16,11 +16,12 @@ from gi.repository import Gtk, Adw, WebKit, Gio, GLib, Gdk, GdkPixbuf
 
 import parser
 
-APP_ID = "org.Readit.Readit"
+APP_ID = "org.voz.Readit"
 APP_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = APP_DIR / "assets"
 READER_HTML = ASSETS_DIR / "reader.html"
 LOGO_SVG = ASSETS_DIR / "logo.svg"
+HEADER_LOGO_SVG = ASSETS_DIR / "logo-header.svg"
 
 FONT_OPTIONS = [
     ("literata", "Literata (Book Serif)"),
@@ -208,7 +209,7 @@ class ReaditWindow(Adw.ApplicationWindow):
         header.set_show_title(False)
 
         brand = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        logo = Gtk.Image.new_from_file(str(LOGO_SVG))
+        logo = Gtk.Image.new_from_file(str(HEADER_LOGO_SVG))
         logo.set_pixel_size(32)
         title_widget = Gtk.Label(label="Readit")
         title_widget.add_css_class("title-4")

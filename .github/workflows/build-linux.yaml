@@ -26,7 +26,7 @@ jobs:
           mkdir -p dist/readit-linux/assets dist/readit-linux/packaging
           cp main.py parser.py install.sh PKGBUILD dist/readit-linux/
           cp assets/* dist/readit-linux/assets/
-          cp packaging/org.Readit.Readit.desktop dist/readit-linux/packaging/
+          cp packaging/org.voz.Readit.desktop dist/readit-linux/packaging/
           chmod +x dist/readit-linux/install.sh
           tar -czvf dist/readit-linux-x86_64.tar.gz -C dist readit-linux
 
@@ -46,7 +46,7 @@ jobs:
           Priority: optional
           Architecture: all
           Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, gir1.2-webkit-6.0, python3-pymupdf
-          Maintainer: Readit Readit
+          Maintainer: voz Readit
           Description: Distraction-free reflowable PDF book reader for Linux
           EOF
           sed -i 's/^          //' "$PKG_ROOT/DEBIAN/control"
@@ -54,9 +54,9 @@ jobs:
           cp main.py parser.py "$PKG_ROOT/usr/lib/readit/"
           cp assets/* "$PKG_ROOT/usr/lib/readit/assets/"
           if [ -f assets/logo.svg ]; then
-            cp assets/logo.svg "$PKG_ROOT/usr/share/icons/hicolor/scalable/apps/org.Readit.Readit.svg"
+            cp assets/logo.svg "$PKG_ROOT/usr/share/icons/hicolor/scalable/apps/org.voz.Readit.svg"
           fi
-          cp packaging/org.Readit.Readit.desktop "$PKG_ROOT/usr/share/applications/"
+          cp packaging/org.voz.Readit.desktop "$PKG_ROOT/usr/share/applications/"
 
           cat > "$PKG_ROOT/usr/bin/readit" << 'EOF'
           #!/usr/bin/env bash
