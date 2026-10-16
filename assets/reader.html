@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Readit Reader</title>
+  <link rel="stylesheet" href="reader.css" />
+</head>
+<body data-theme="gnome-dark" data-font="literata" data-colorful="false" data-fast="false" data-fullscreen="false">
+
+  <!-- Hidden SVG color-temperature matrix for Night Light -->
+  <svg width="0" height="0" style="position:absolute; pointer-events:none;" aria-hidden="true">
+    <defs>
+      <filter id="kelvin-warmth-filter" color-interpolation-filters="sRGB">
+        <feColorMatrix id="kelvin-matrix" type="matrix"
+          values="1 0 0 0 0
+                  0 1 0 0 0
+                  0 0 1 0 0
+                  0 0 0 1 0" />
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- ============ TOP-LEFT: back + reading options (invisible until hovered) ============ -->
+  <div id="top-left-hotspot" class="hotspot hotspot-left">
+    <div class="chrome-pill">
+      <button id="btn-back" class="pill-btn" title="Back to Library (Esc)" aria-label="Back to Library">
+        <svg viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+      </button>
+      <div class="pill-divider"></div>
+      <button id="btn-dropdown" class="pill-btn" title="Reading options" aria-label="Reading options" aria-expanded="false">
+        <svg class="chev" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+    </div>
+
+    <div id="reader-dropdown" class="dropdown-panel" role="dialog" aria-label="Reading options" aria-hidden="true">
+      <header class="dp-head">
+        <span id="dropdown-book-title" class="dp-title">Book</span>
+        <span id="dropdown-progress" class="dp-pct">0%</span>
+      </header>
+
+      <div class="dp-scroll">
+        <!-- Theme -->
+        <section class="dp-sec">
+          <h4 class="dp-label">Theme</h4>
+          <div class="theme-grid">
+            <button class="theme-swatch" data-theme-val="gnome-dark" title="GNOME Dark">
+              <span class="swatch-circle swatch-gnome-dark"></span><span>Dark</span>
+            </button>
+            <button class="theme-swatch" data-theme-val="oled-black" title="OLED Pitch Black">
+              <span class="swatch-circle swatch-oled-black"></span><span>OLED</span>
+            </button>
+            <button class="theme-swatch" data-theme-val="warm-sepia" title="Warm Paper">
+              <span class="swatch-circle swatch-warm-sepia"></span><span>Warm</span>
+            </button>
+            <button class="theme-swatch" data-theme-val="crisp-light" title="Crisp Light">
+              <span class="swatch-circle swatch-crisp-light"></span><span>Light</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Typeface: custom picker, each option previewed in its own font -->
+        <section class="dp-sec">
+          <h4 class="dp-label">Typeface</h4>
+          <div id="fontpick" class="fontpick">
+            <button id="fontpick-btn" class="fontpick-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span id="fontpick-current" class="fontpick-current">Literata</span>
+              <svg class="fontpick-chev" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="fontpick-wrap">
+              <ul id="fontpick-list" class="fontpick-list" role="listbox" aria-label="Typeface">
+                <li class="fp-opt" role="option" data-font="literata"     data-label="Literata">
+                  <span class="fp-name">Literata</span><span class="fp-tag">Book serif</span>
+                </li>
+                <li class="fp-opt" role="option" data-font="plex-serif"   data-label="IBM Plex Serif">
+                  <span class="fp-name">IBM Plex Serif</span><span class="fp-tag">Editorial</span>
+                </li>
+                <li class="fp-opt" role="option" data-font="garamond"     data-label="EB Garamond">
+                  <span class="fp-name">EB Garamond</span><span class="fp-tag">Classic</span>
+                </li>
+                <li class="fp-opt" role="option" data-font="hyperlegible" data-label="Atkinson Hyperlegible">
+                  <span class="fp-name">Atkinson Hyperlegible</span><span class="fp-tag">Clarity</span>
+                </li>
+                <li class="fp-opt" role="option" data-font="inter"        data-label="Inter">
+                  <span class="fp-name">Inter</span><span class="fp-tag">Clean sans</span>
+                </li>
+                <li class="fp-opt" role="option" data-font="mono"         data-label="JetBrains Mono">
+                  <span class="fp-name">JetBrains Mono</span><span class="fp-tag">Technical</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- Size & width -->
+        <section class="dp-sec dp-rows">
+          <div class="dp-row">
+            <span class="dp-row-label">Text size</span>
+            <div class="stepper">
+              <button id="btn-font-dec" type="button" aria-label="Smaller text">&minus;</button>
+              <span id="val-font-size" class="stepper-val">19px</span>
+              <button id="btn-font-inc" type="button" aria-label="Larger text">+</button>
+            </div>
+          </div>
+          <div class="dp-row">
+            <span class="dp-row-label">Line width</span>
+            <div class="stepper">
+              <button id="btn-width-dec" type="button" aria-label="Narrower lines">&minus;</button>
+              <span id="val-width" class="stepper-val">64ch</span>
+              <button id="btn-width-inc" type="button" aria-label="Wider lines">+</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Light -->
+        <section class="dp-sec">
+          <div class="slider-block">
+            <div class="label-row">
+              <label class="dp-row-label" for="slider-warmth">Night light</label>
+              <span id="val-warmth" class="control-val">0%</span>
+            </div>
+            <input id="slider-warmth" type="range" min="0" max="100" value="0" class="clean-slider" />
+          </div>
+          <div class="slider-block">
+            <div class="label-row">
+              <label class="dp-row-label" for="slider-saturation">Saturation</label>
+              <span id="val-saturation" class="control-val">100%</span>
+            </div>
+            <input id="slider-saturation" type="range" min="0" max="140" value="100" class="clean-slider" />
+          </div>
+        </section>
+
+        <!-- Toggles -->
+        <section class="dp-sec dp-toggles">
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <span class="dp-row-label">Fast reading</span>
+              <span class="toggle-sub">Bright word starts, dimmer endings. Press B to toggle.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-fast" />
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+          <div id="fast-strength" class="segmented fast-strength" role="group" aria-label="Fast reading strength">
+            <button type="button" data-strength="1">Subtle</button>
+            <button type="button" data-strength="2">Balanced</button>
+            <button type="button" data-strength="3">Strong</button>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <span class="dp-row-label">Colorful illustrations</span>
+              <span class="toggle-sub">Keep original colors instead of a monochrome blend</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-colorful" />
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TOP-RIGHT: fullscreen + close (invisible until hovered) ============ -->
+  <div id="top-right-hotspot" class="hotspot hotspot-right">
+    <div class="chrome-pill">
+      <button id="btn-fullscreen" class="pill-btn" title="Fullscreen (F11)" aria-label="Toggle fullscreen">
+        <svg class="icon-enter-fs" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <polyline points="9 21 3 21 3 15"></polyline>
+          <line x1="21" y1="3" x2="14" y2="10"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+        <svg class="icon-exit-fs" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 14 10 14 10 20"></polyline>
+          <polyline points="20 10 14 10 14 4"></polyline>
+          <line x1="14" y1="10" x2="21" y2="3"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+      </button>
+      <div class="pill-divider"></div>
+      <button id="btn-close-app" class="pill-btn pill-btn-close" title="Close Readit" aria-label="Close Readit">
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Continuous vertical reading canvas -->
+  <main id="viewport-filter-layer">
+    <article id="book-stream" class="book-stream"></article>
+  </main>
+
+  <script src="reader.js"></script>
+</body>
+</html>
