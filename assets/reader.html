@@ -6,20 +6,7 @@
   <title>Readit Reader</title>
   <link rel="stylesheet" href="reader.css" />
 </head>
-<body data-theme="gnome-dark" data-font="literata" data-colorful="false" data-fast="false" data-fullscreen="false">
-
-  <!-- Hidden SVG color-temperature matrix for Night Light -->
-  <svg width="0" height="0" style="position:absolute; pointer-events:none;" aria-hidden="true">
-    <defs>
-      <filter id="kelvin-warmth-filter" color-interpolation-filters="sRGB">
-        <feColorMatrix id="kelvin-matrix" type="matrix"
-          values="1 0 0 0 0
-                  0 1 0 0 0
-                  0 0 1 0 0
-                  0 0 0 1 0" />
-      </filter>
-    </defs>
-  </svg>
+<body data-theme="gnome-dark" data-font="literata" data-colorful="false" data-fast="false" data-fullscreen="false" data-maximized="false">
 
   <!-- ============ TOP-LEFT: back + reading options (invisible until hovered) ============ -->
   <div id="top-left-hotspot" class="hotspot hotspot-left">
@@ -64,7 +51,7 @@
           </div>
         </section>
 
-        <!-- Typeface: custom picker, each option previewed in its own font -->
+        <!-- Typeface -->
         <section class="dp-sec">
           <h4 class="dp-label">Typeface</h4>
           <div id="fontpick" class="fontpick">
@@ -170,9 +157,19 @@
     </div>
   </div>
 
-  <!-- ============ TOP-RIGHT: fullscreen + close (invisible until hovered) ============ -->
+  <!-- ============ TOP-RIGHT: maximize + fullscreen + close (invisible until hovered) ============ -->
   <div id="top-right-hotspot" class="hotspot hotspot-right">
     <div class="chrome-pill">
+      <button id="btn-maximize" class="pill-btn" title="Maximize window (M)" aria-label="Toggle maximize">
+        <svg class="icon-enter-max" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="2.5"></rect>
+        </svg>
+        <svg class="icon-exit-max" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="7" width="14" height="14" rx="2"></rect>
+          <path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"></path>
+        </svg>
+      </button>
+      <div class="pill-divider"></div>
       <button id="btn-fullscreen" class="pill-btn" title="Fullscreen (F11)" aria-label="Toggle fullscreen">
         <svg class="icon-enter-fs" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="15 3 21 3 21 9"></polyline>
@@ -194,6 +191,50 @@
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
       </button>
+    </div>
+  </div>
+
+  <!-- ============ FLOATING SELECTION POPOVER (DICTIONARY + FREE AI + GOOGLE AI) ============ -->
+  <div id="selection-popover" class="sel-popover" aria-hidden="true">
+    <div class="sel-toolbar">
+      <button id="btn-sel-dict" class="sel-btn" type="button" title="In-App Dictionary">
+        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+        <span>Define</span>
+      </button>
+      <button id="btn-sel-ai" class="sel-btn" type="button" title="Free In-App AI Explanation">
+        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z"></path>
+        </svg>
+        <span>AI Explain</span>
+      </button>
+      <button id="btn-sel-google" class="sel-btn" type="button" title="Open meaning in Google Search AI">
+        <svg viewBox="0 0 24 24" width="13.5" height="13.5" stroke="currentColor" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span>Google AI ↗</span>
+      </button>
+      <button id="btn-sel-copy" class="sel-btn sel-btn-icon" type="button" title="Copy selected text">
+        <svg viewBox="0 0 24 24" width="13.5" height="13.5" stroke="currentColor" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div id="sel-card" class="sel-card" hidden>
+      <div class="sel-card-head">
+        <div class="sel-card-title-wrap">
+          <span id="sel-card-title" class="sel-card-title"></span>
+          <span id="sel-card-phonetic" class="sel-card-phonetic"></span>
+        </div>
+        <span id="sel-card-badge" class="sel-card-badge"></span>
+      </div>
+      <div id="sel-card-body" class="sel-card-body"></div>
+      <div id="sel-card-example" class="sel-card-example" hidden></div>
     </div>
   </div>
 

@@ -1,0 +1,84 @@
+name: Build Linux Packages
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Python syntax
+        run: |
+          python3 -m py_compile main.py parser.py
+
+      - name: Build Universal Linux Tarball (.tar.gz)
+        run: |
+          mkdir -p dist/readit-linux/assets dist/readit-linux/packaging
+          cp main.py parser.py install.sh PKGBUILD dist/readit-linux/
+          cp assets/* dist/readit-linux/assets/
+          cp packaging/org.Readit.Readit.desktop dist/readit-linux/packaging/
+          chmod +x dist/readit-linux/install.sh
+          tar -czvf dist/readit-linux-x86_64.tar.gz -C dist readit-linux
+
+      - name: Build Debian/Ubuntu Package (.deb)
+        run: |
+          PKG_ROOT="dist/deb/readit_1.0.0_all"
+          mkdir -p "$PKG_ROOT/DEBIAN"
+          mkdir -p "$PKG_ROOT/usr/lib/readit/assets"
+          mkdir -p "$PKG_ROOT/usr/bin"
+          mkdir -p "$PKG_ROOT/usr/share/applications"
+          mkdir -p "$PKG_ROOT/usr/share/icons/hicolor/scalable/apps"
+
+          cat > "$PKG_ROOT/DEBIAN/control" << 'EOF'
+          Package: readit
+          Version: 1.0.0
+          Section: text
+          Priority: optional
+          Architecture: all
+          Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, gir1.2-webkit-6.0, python3-pymupdf
+          Maintainer: Readit Readit
+          Description: Distraction-free reflowable PDF book reader for Linux
+          EOF
+          sed -i 's/^          //' "$PKG_ROOT/DEBIAN/control"
+
+          cp main.py parser.py "$PKG_ROOT/usr/lib/readit/"
+          cp assets/* "$PKG_ROOT/usr/lib/readit/assets/"
+          if [ -f assets/logo.svg ]; then
+            cp assets/logo.svg "$PKG_ROOT/usr/share/icons/hicolor/scalable/apps/org.Readit.Readit.svg"
+          fi
+          cp packaging/org.Readit.Readit.desktop "$PKG_ROOT/usr/share/applications/"
+
+          cat > "$PKG_ROOT/usr/bin/readit" << 'EOF'
+          #!/usr/bin/env bash
+          exec python3 /usr/lib/readit/main.py "$@"
+          EOF
+          sed -i 's/^          //' "$PKG_ROOT/usr/bin/readit"
+          chmod 755 "$PKG_ROOT/usr/bin/readit"
+
+          dpkg-deb --build --root-owner-group "$PKG_ROOT" dist/readit_1.0.0_all.deb
+
+      - name: Upload Linux Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: readit-linux-packages
+          path: |
+            dist/readit-linux-x86_64.tar.gz
+            dist/readit_1.0.0_all.deb
+
+      - name: Publish GitHub Release (on version tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/readit-linux-x86_64.tar.gz
+            dist/readit_1.0.0_all.deb

@@ -1,18 +1,26 @@
 import sys
 import json
+import shutil
 import threading
+import webbrowser
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("WebKit", "6.0")
-from gi.repository import Gtk, Adw, WebKit, Gio, GLib, Gdk
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import Gtk, Adw, WebKit, Gio, GLib, Gdk, GdkPixbuf
 
 import parser
 
+APP_ID = "org.Readit.Readit"
 APP_DIR = Path(__file__).resolve().parent
-READER_HTML = APP_DIR / "assets" / "reader.html"
+ASSETS_DIR = APP_DIR / "assets"
+READER_HTML = ASSETS_DIR / "reader.html"
+LOGO_SVG = ASSETS_DIR / "logo.svg"
 
 FONT_OPTIONS = [
     ("literata", "Literata (Book Serif)"),
@@ -36,6 +44,56 @@ FAST_STRENGTH_OPTIONS = [
     (3, "Strong"),
 ]
 
+LIBRARY_CSS = """
+.book-card {
+    border-radius: 12px;
+    padding: 8px;
+    transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.book-card button.flat,
+.book-cover-frame {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+.book-cover-frame {
+    border-radius: 7px;
+    overflow: hidden;
+}
+.book-title-label {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+.book-meta-label {
+    font-size: 11px;
+    opacity: 0.65;
+}
+.book-progress-bar trough {
+    min-height: 4px;
+    border-radius: 99px;
+}
+.book-progress-bar progress {
+    min-height: 4px;
+    border-radius: 99px;
+}
+"""
+
+
+def install_user_app_icon():
+    """Ensure logo.svg is registered in ~/.local/share/icons/hicolor so GNOME & GTK4
+    use it for the top-left window icon and dock instead of the generic gear icon."""
+    if not LOGO_SVG.exists():
+        return
+    try:
+        icon_dir = Path.home() / ".local" / "share" / "icons" / "hicolor" / "scalable" / "apps"
+        icon_dir.mkdir(parents=True, exist_ok=True)
+        dest = icon_dir / f"{APP_ID}.svg"
+        if not dest.exists() or dest.stat().st_mtime < LOGO_SVG.stat().st_mtime:
+            shutil.copy2(LOGO_SVG, dest)
+    except Exception:
+        pass
+
 
 class ReaditWindow(Adw.ApplicationWindow):
     def __init__(self, app):
@@ -45,27 +103,49 @@ class ReaditWindow(Adw.ApplicationWindow):
         self.webview_ready = False
         self.pending_book_payload = None
 
-        # Root stack switches between Library (with headerbar) and Reader (100% chromeless)
+        self._apply_custom_css()
+        self._setup_app_icon()
+
         self.root_stack = Gtk.Stack()
         self.root_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
-        self.root_stack.set_transition_duration(180)
+        self.root_stack.set_transition_duration(150)
         self.set_content(self.root_stack)
 
         self._build_library_page()
         self._build_reader_page()
         self._setup_shortcuts()
 
-        # Keep the reader's fullscreen button in sync with the real window state
-        self.connect("notify::fullscreened", self._on_fullscreen_changed)
+        self.connect("notify::fullscreened", self._on_window_state_changed)
+        self.connect("notify::maximized", self._on_window_state_changed)
 
         self.refresh_library()
 
+    def _apply_custom_css(self):
+        provider = Gtk.CssProvider()
+        provider.load_from_string(LIBRARY_CSS)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
+
+    def _setup_app_icon(self):
+        install_user_app_icon()
+        display = Gdk.Display.get_default()
+        if display:
+            icon_theme = Gtk.IconTheme.get_for_display(display)
+            user_icons = Path.home() / ".local" / "share" / "icons"
+            if user_icons.exists():
+                icon_theme.add_search_path(str(user_icons))
+            if ASSETS_DIR.exists():
+                icon_theme.add_search_path(str(ASSETS_DIR))
+        self.set_icon_name(APP_ID)
+
     # ------------------------------------------------------------------
-    # SHORTCUTS
+    # SHORTCUTS & WINDOW STATES
     # ------------------------------------------------------------------
     def _setup_shortcuts(self):
         key_ctrl = Gtk.EventControllerKey()
-        # Capture phase: the window sees Esc / F11 before the WebView can swallow them
         key_ctrl.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         key_ctrl.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_ctrl)
@@ -85,16 +165,25 @@ class ReaditWindow(Adw.ApplicationWindow):
         else:
             self.fullscreen()
 
-    def _on_fullscreen_changed(self, *_args):
+    def toggle_maximize(self):
+        if self.is_fullscreen():
+            self.unfullscreen()
+        if self.is_maximized():
+            self.unmaximize()
+        else:
+            self.maximize()
+
+    def _on_window_state_changed(self, *_args):
         if self.webview_ready:
-            flag = "true" if self.is_fullscreen() else "false"
+            fs = "true" if self.is_fullscreen() else "false"
+            mx = "true" if self.is_maximized() else "false"
             self.webview.evaluate_javascript(
-                f"window.ReaditEngine && window.ReaditEngine.setFullscreen({flag});",
+                f"window.ReaditEngine && window.ReaditEngine.setWindowState({{fullscreen: {fs}, maximized: {mx}}});",
                 -1, None, None, None, None,
             )
 
     # ------------------------------------------------------------------
-    # LIBRARY VIEW
+    # LIBRARY VIEW (CLEAN HEADERBAR & COMPACT SHELF)
     # ------------------------------------------------------------------
     def _build_library_page(self):
         toolbar_view = Adw.ToolbarView()
@@ -103,8 +192,9 @@ class ReaditWindow(Adw.ApplicationWindow):
         title_widget = Adw.WindowTitle(title="Readit", subtitle="Focused Book Reader")
         header.set_title_widget(title_widget)
 
-        add_btn = Gtk.Button(label="Add Book")
-        add_btn.set_icon_name("list-add-symbolic")
+        add_btn = Gtk.Button()
+        add_content = Adw.ButtonContent(icon_name="list-add-symbolic", label="Add Book")
+        add_btn.set_child(add_content)
         add_btn.add_css_class("suggested-action")
         add_btn.connect("clicked", self._on_add_book_clicked)
         header.pack_start(add_btn)
@@ -145,23 +235,24 @@ class ReaditWindow(Adw.ApplicationWindow):
         loading_box.append(self.loading_label)
         self.lib_stack.add_named(loading_box, "loading")
 
-        # Books Grid
+        # Compact Books Shelf
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
-        clamp = Adw.Clamp(maximum_size=1100, tightening_threshold=700)
-        clamp.set_margin_top(28)
-        clamp.set_margin_bottom(36)
+        clamp = Adw.Clamp(maximum_size=1040, tightening_threshold=680)
+        clamp.set_margin_top(24)
+        clamp.set_margin_bottom(32)
         clamp.set_margin_start(24)
         clamp.set_margin_end(24)
 
         self.flowbox = Gtk.FlowBox()
         self.flowbox.set_valign(Gtk.Align.START)
-        self.flowbox.set_max_children_per_line(5)
+        self.flowbox.set_halign(Gtk.Align.START)
+        self.flowbox.set_max_children_per_line(7)
         self.flowbox.set_min_children_per_line(2)
-        self.flowbox.set_column_spacing(22)
-        self.flowbox.set_row_spacing(22)
-        self.flowbox.set_homogeneous(True)
+        self.flowbox.set_column_spacing(16)
+        self.flowbox.set_row_spacing(18)
+        self.flowbox.set_homogeneous(False)
         self.flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
 
         clamp.set_child(self.flowbox)
@@ -186,61 +277,76 @@ class ReaditWindow(Adw.ApplicationWindow):
         self.lib_stack.set_visible_child_name("grid")
 
     def _create_book_card(self, book: dict) -> Gtk.Widget:
-        card_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        card_box.add_css_class("card")
-        card_box.set_size_request(190, 310)
-        card_box.set_margin_top(4)
-        card_box.set_margin_bottom(4)
+        card_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        card_box.add_css_class("book-card")
+        card_box.set_size_request(140, -1)
+        card_box.set_hexpand(False)
+        card_box.set_vexpand(False)
+        card_box.set_halign(Gtk.Align.START)
+        card_box.set_valign(Gtk.Align.START)
 
-        # Cover area + clickable button
         cover_btn = Gtk.Button()
         cover_btn.add_css_class("flat")
-        cover_btn.set_hexpand(True)
-        cover_btn.set_vexpand(True)
         cover_btn.connect("clicked", lambda _b, bid=book["id"]: self.open_book(bid))
 
-        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        inner.set_margin_top(12)
-        inner.set_margin_bottom(8)
-        inner.set_margin_start(12)
-        inner.set_margin_end(12)
+        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        inner.set_margin_top(2)
+        inner.set_margin_bottom(2)
+        inner.set_margin_start(2)
+        inner.set_margin_end(2)
 
         cover_frame = Gtk.Frame()
-        cover_frame.set_size_request(156, 210)
+        cover_frame.add_css_class("book-cover-frame")
+        cover_frame.set_size_request(124, 168)
         cover_frame.set_halign(Gtk.Align.CENTER)
+        cover_frame.set_valign(Gtk.Align.START)
 
         cover_path = book.get("cover_path", "")
         if cover_path and Path(cover_path).exists():
-            pic = Gtk.Picture.new_for_filename(cover_path)
-            pic.set_content_fit(Gtk.ContentFit.COVER)
-            cover_frame.set_child(pic)
+            try:
+                # Scale pixbuf to exact thumbnail dimensions so Gtk.Picture never expands the card
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(cover_path, 124, 168, False)
+                texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+                pic = Gtk.Picture.new_for_paintable(texture)
+                pic.set_can_shrink(False)
+                cover_frame.set_child(pic)
+            except Exception:
+                fallback_icon = Gtk.Image.new_from_icon_name("x-office-document-symbolic")
+                fallback_icon.set_pixel_size(40)
+                cover_frame.set_child(fallback_icon)
         else:
             fallback_icon = Gtk.Image.new_from_icon_name("x-office-document-symbolic")
-            fallback_icon.set_pixel_size(64)
+            fallback_icon.set_pixel_size(40)
             cover_frame.set_child(fallback_icon)
 
         title_lbl = Gtk.Label(label=book.get("title", "Untitled"))
         title_lbl.set_wrap(True)
         title_lbl.set_lines(2)
+        title_lbl.set_width_chars(14)
+        title_lbl.set_max_width_chars(14)
         title_lbl.set_ellipsize(3)  # PANGO_ELLIPSIZE_END
         title_lbl.set_justify(Gtk.Justification.CENTER)
-        title_lbl.add_css_class("heading")
+        title_lbl.add_css_class("book-title-label")
 
         inner.append(cover_frame)
         inner.append(title_lbl)
         cover_btn.set_child(inner)
         card_box.append(cover_btn)
 
-        # Bottom progress label + delete icon row
-        footer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        footer.set_margin_start(14)
-        footer.set_margin_end(10)
-        footer.set_margin_bottom(10)
-
         pct = float(book.get("progress_pct", 0.0))
-        prog_lbl = Gtk.Label(label=f"{pct:.0f}% read" if pct > 0 else "Unread")
-        prog_lbl.add_css_class("dim-label")
-        prog_lbl.add_css_class("caption")
+        pbar = Gtk.ProgressBar()
+        pbar.add_css_class("book-progress-bar")
+        pbar.set_fraction(max(0.0, min(1.0, pct / 100.0)))
+        pbar.set_margin_start(6)
+        pbar.set_margin_end(6)
+        card_box.append(pbar)
+
+        footer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        footer.set_margin_start(6)
+        footer.set_margin_end(2)
+
+        prog_lbl = Gtk.Label(label=f"{pct:.0f}%" if pct > 0 else "New")
+        prog_lbl.add_css_class("book-meta-label")
         prog_lbl.set_hexpand(True)
         prog_lbl.set_xalign(0.0)
 
@@ -280,7 +386,9 @@ class ReaditWindow(Adw.ApplicationWindow):
             filepath = gfile.get_path()
         except GLib.Error:
             return
+        self.import_and_open_pdf(filepath)
 
+    def import_and_open_pdf(self, filepath: str):
         self.lib_stack.set_visible_child_name("loading")
 
         def worker():
@@ -311,7 +419,6 @@ class ReaditWindow(Adw.ApplicationWindow):
         self.webview.set_hexpand(True)
         self.webview.set_vexpand(True)
 
-        # Match GNOME Dark background before HTML paints so there is zero white flash
         bg = Gdk.RGBA()
         bg.parse("#1e1e1e")
         self.webview.set_background_color(bg)
@@ -340,7 +447,6 @@ class ReaditWindow(Adw.ApplicationWindow):
         if not book:
             return
 
-        # Books imported by an older parser are rebuilt once, in the background
         if parser.needs_reparse(book):
             self.root_stack.set_visible_child_name("library")
             self.lib_stack.set_visible_child_name("loading")
@@ -373,6 +479,7 @@ class ReaditWindow(Adw.ApplicationWindow):
             "blocks": blocks,
             "settings": settings,
             "fullscreen": self.is_fullscreen(),
+            "maximized": self.is_maximized(),
         }
 
         self.root_stack.set_visible_child_name("reader")
@@ -384,7 +491,11 @@ class ReaditWindow(Adw.ApplicationWindow):
         return False
 
     def _dispatch_to_reader(self, payload: dict):
-        json_str = json.dumps(payload, ensure_ascii=False)
+        json_str = (
+            json.dumps(payload, ensure_ascii=False)
+            .replace("\u2028", "\\u2028")
+            .replace("\u2029", "\\u2029")
+        )
         js_call = f"window.ReaditEngine && window.ReaditEngine.loadBook({json_str});"
         self.webview.evaluate_javascript(js_call, -1, None, None, None, None)
 
@@ -393,6 +504,101 @@ class ReaditWindow(Adw.ApplicationWindow):
             json_str = json.dumps(settings, ensure_ascii=False)
             js_call = f"window.ReaditEngine && window.ReaditEngine.applySettings({json_str});"
             self.webview.evaluate_javascript(js_call, -1, None, None, None, None)
+
+    # ------------------------------------------------------------------
+    # IN-APP DICTIONARY + FREE AI + GOOGLE AI SEARCH
+    # ------------------------------------------------------------------
+    def _handle_lookup_selection(self, req_id: int, text: str, context: str, mode: str):
+        def worker():
+            clean_text = text.strip()
+            words = clean_text.split()
+            result = {
+                "req_id": req_id,
+                "mode": mode,
+                "title": clean_text[:60],
+                "phonetic": "",
+                "badge": "",
+                "body": "",
+                "example": "",
+                "error": False,
+            }
+
+            headers = {"User-Agent": "ReaditLinuxReader/1.0"}
+
+            if mode == "dict" or (mode == "auto" and len(words) == 1 and len(clean_text) <= 32):
+                word_clean = clean_text.strip(".,!?;:\"'()[]{}").lower()
+                dict_url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{urllib.parse.quote(word_clean)}"
+                try:
+                    req = urllib.request.Request(dict_url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        if isinstance(data, list) and data:
+                            entry = data[0]
+                            result["title"] = entry.get("word", word_clean)
+                            result["phonetic"] = entry.get("phonetic") or ""
+                            meanings = entry.get("meanings") or []
+                            if meanings:
+                                m0 = meanings[0]
+                                result["badge"] = m0.get("partOfSpeech", "word")
+                                defs = m0.get("definitions") or []
+                                lines = []
+                                for idx, d in enumerate(defs[:2], 1):
+                                    lines.append(f"{idx}. {d.get('definition', '')}")
+                                    if not result["example"] and d.get("example"):
+                                        result["example"] = f"“{d.get('example')}”"
+                                result["body"] = "\n".join(lines)
+                                result["mode"] = "dict"
+                                GLib.idle_add(self._send_lookup_result, result)
+                                return
+                except Exception:
+                    pass
+
+            try:
+                prompt = (
+                    f"Explain the meaning of \"{clean_text}\" clearly and concisely in 2 to 3 sentences. "
+                    f"Context from the book: \"{context[:360]}\". "
+                    f"Reply with only the direct explanation, no markdown headers or intro fluff."
+                )
+                ai_url = f"https://text.pollinations.ai/{urllib.parse.quote(prompt)}?model=openai"
+                req = urllib.request.Request(ai_url, headers=headers)
+                with urllib.request.urlopen(req, timeout=9) as resp:
+                    ai_text = resp.read().decode("utf-8").strip()
+                    if ai_text:
+                        result["mode"] = "ai"
+                        result["badge"] = "AI Context Explanation"
+                        result["body"] = ai_text
+                        GLib.idle_add(self._send_lookup_result, result)
+                        return
+            except Exception:
+                pass
+
+            result["error"] = True
+            result["badge"] = "Offline / Unavailable"
+            result["body"] = "Could not reach the online dictionary or AI service. Click 'Google AI' below to open in your browser."
+            GLib.idle_add(self._send_lookup_result, result)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _send_lookup_result(self, result: dict):
+        if self.webview_ready:
+            json_str = json.dumps(result, ensure_ascii=False)
+            self.webview.evaluate_javascript(
+                f"window.ReaditEngine && window.ReaditEngine.onLookupResult({json_str});",
+                -1, None, None, None, None,
+            )
+        return False
+
+    def _open_google_ai_query(self, text: str, context: str):
+        clean = text.strip()
+        if len(clean.split()) <= 2:
+            query = f'define "{clean}" meaning and usage'
+        else:
+            query = f'Explain the meaning of "{clean}"'
+        url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+        try:
+            Gio.AppInfo.launch_default_for_uri(url, None)
+        except Exception:
+            webbrowser.open(url)
 
     def _save_progress_from_msg(self, msg: dict):
         if "block_id" in msg and self.active_book_id:
@@ -420,6 +626,20 @@ class ReaditWindow(Adw.ApplicationWindow):
             self.close_book_to_library()
         elif action == "toggle_fullscreen":
             self.toggle_fullscreen()
+        elif action == "toggle_maximize":
+            self.toggle_maximize()
+        elif action == "lookup_selection":
+            self._handle_lookup_selection(
+                int(msg.get("req_id", 1)),
+                str(msg.get("text", "")),
+                str(msg.get("context", "")),
+                str(msg.get("mode", "auto")),
+            )
+        elif action == "open_google_ai":
+            self._open_google_ai_query(
+                str(msg.get("text", "")),
+                str(msg.get("context", "")),
+            )
         elif action == "close_app":
             self._save_progress_from_msg(msg)
             self.close()
@@ -432,7 +652,7 @@ class ReaditWindow(Adw.ApplicationWindow):
         self.root_stack.set_visible_child_name("library")
 
     # ------------------------------------------------------------------
-    # GLOBAL SETTINGS DIALOG (FROM LIBRARY HEADER)
+    # GLOBAL SETTINGS DIALOG
     # ------------------------------------------------------------------
     def _on_open_settings(self, _btn):
         settings = parser.load_settings()
@@ -443,7 +663,6 @@ class ReaditWindow(Adw.ApplicationWindow):
         page = Adw.PreferencesPage()
         win.add(page)
 
-        # Group 1: Typography & Fonts
         typo_group = Adw.PreferencesGroup(
             title="Typography",
             description="Choose a comfortable long-form reading typeface and text scale.",
@@ -480,7 +699,6 @@ class ReaditWindow(Adw.ApplicationWindow):
         size_row.add_suffix(size_spin)
         typo_group.add(size_row)
 
-        # Group 2: Fast reading
         fast_group = Adw.PreferencesGroup(
             title="Fast Reading",
             description="Highlights the first letters of each word and dims the rest, so your eyes glide across the line.",
@@ -516,7 +734,6 @@ class ReaditWindow(Adw.ApplicationWindow):
         strength_row.connect("notify::selected", on_strength_changed)
         fast_group.add(strength_row)
 
-        # Group 3: Theme & Illustrations
         visual_group = Adw.PreferencesGroup(
             title="Theme & Illustration Blending",
             description="Control how page surfaces and inline illustrations blend together.",
@@ -562,20 +779,30 @@ class ReaditWindow(Adw.ApplicationWindow):
 class ReaditApp(Adw.Application):
     def __init__(self):
         super().__init__(
-            application_id="org.Readit.Readit",
-            flags=Gio.ApplicationFlags.FLAGS_NONE,
+            application_id=APP_ID,
+            flags=Gio.ApplicationFlags.HANDLES_OPEN,
         )
 
     def do_startup(self):
         Adw.Application.do_startup(self)
+        install_user_app_icon()
         style_manager = Adw.StyleManager.get_default()
         style_manager.set_color_scheme(Adw.ColorScheme.PREFER_DARK)
+        Gtk.Window.set_default_icon_name(APP_ID)
 
     def do_activate(self):
         win = self.props.active_window
         if not win:
             win = ReaditWindow(self)
         win.present()
+
+    def do_open(self, files, _n_files, _hint):
+        self.do_activate()
+        win = self.props.active_window
+        if win and files:
+            filepath = files[0].get_path()
+            if filepath and filepath.lower().endswith(".pdf"):
+                win.import_and_open_pdf(filepath)
 
 
 if __name__ == "__main__":

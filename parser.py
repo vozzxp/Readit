@@ -7,7 +7,10 @@ from collections import defaultdict
 from pathlib import Path
 from statistics import median
 
-import fitz  # PyMuPDF
+try:
+    import pymupdf as fitz
+except ImportError:
+    import fitz  # Fallback for older PyMuPDF releases
 
 
 # Bump this whenever the reflow logic changes. Books imported with an older
@@ -117,7 +120,6 @@ def _compute_file_hash(filepath: str) -> str:
 # ----------------------------------------------------------------------
 ROMAN_RE = r"(?=[ivxlcdm]+$)m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})"
 
-# "Chapter title ........ 23"  /  "Preface   ix"  /  "Success in the Larger Sale 4"
 TOC_LINE_RE = re.compile(
     r"^(?P<title>.*?\S)(?:\s*[.\u00b7\u2022\u2026_\-\u2013]{2,}\s*|\s+)"
     r"(?P<page>\d{1,4}|" + ROMAN_RE + r")$"
@@ -176,7 +178,6 @@ def _extract_lines(block: dict) -> list:
                 continue
             size = span.get("size", 11.0)
             sx0, _, sx1, _ = span.get("bbox", (0, 0, 0, 0))
-            # A wide visual gap with no space character (tab-style leaders) -> real space
             if (
                 parts
                 and prev_x1 is not None
@@ -220,7 +221,7 @@ def _join_texts(texts: list) -> str:
 
 
 def _cluster_rows(lines: list) -> list:
-    """Merge lines that sit on the same visual row (title block + separate page-number block)."""
+    """Merge lines that sit on the same visual row."""
     ordered = sorted(lines, key=lambda l: ((l["y0"] + l["y1"]) / 2, l["x0"]))
     rows = []
     for ln in ordered:
@@ -265,7 +266,6 @@ def _norm_key(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"\d+", "#", text.lower())).strip()
 
 
-
 _ROMAN_FULL = re.compile(r"m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})", re.IGNORECASE)
 
 
@@ -274,7 +274,7 @@ def _is_pageno_token(tok: str) -> bool:
         return True
     if len(tok) > 6 or not tok.isalpha() or not _ROMAN_FULL.fullmatch(tok):
         return False
-    return tok.islower() or len(tok) >= 2  # a lone capital "I" is a pronoun, not a page number
+    return tok.islower() or len(tok) >= 2
 
 
 def _has_pageno_edge(text: str) -> bool:
@@ -301,13 +301,12 @@ def _heading_tag(size: float, bold: bool, text: str, body_size: float, n_lines: 
 
 def _block_to_elements(lines: list, body_size: float) -> list:
     """Turn one PDF text block into reader elements, keeping structure that matters."""
-    lines = _cluster_rows(lines)  # italic lead-ins / tab gaps become one full-width line
+    lines = _cluster_rows(lines)
     n = len(lines)
     size = median([l["size"] for l in lines])
     bold = sum(1 for l in lines if l["bold"]) >= 0.7 * n
     full = _join_texts([l["text"] for l in lines])
 
-    # 1) Headings
     tag = _heading_tag(size, bold, full, body_size, n)
     if tag:
         return [{"type": tag, "text": full}]
@@ -315,7 +314,6 @@ def _block_to_elements(lines: list, body_size: float) -> list:
     if n == 1:
         return [{"type": "p", "text": full}]
 
-    # 2) Table-of-contents style lines that appear outside a detected contents page
     hits = [_toc_parts(l["text"]) for l in lines]
     if sum(1 for h in hits if h) >= 0.6 * n:
         out = []
@@ -326,8 +324,6 @@ def _block_to_elements(lines: list, body_size: float) -> list:
                 out.append({"type": "toc", "text": l["text"], "page": "", "level": 1 if l["bold"] else 2})
         return out
 
-    # 3) Bullet / numbered lists
-    first = lines[0]["text"]
     glyph_marks = [bool(GLYPH_BULLET_RE.match(l["text"])) for l in lines]
     num_marks = [bool(NUM_BULLET_RE.match(l["text"])) for l in lines]
     use_glyph = glyph_marks[0]
@@ -349,14 +345,12 @@ def _block_to_elements(lines: list, body_size: float) -> list:
             for it in items
         ]
 
-    # 4) Short-line text (verse, addresses, signatures, stacked labels): keep the line breaks
     widths = [l["x1"] - l["x0"] for l in lines]
     max_w = max(widths) if widths else 1.0
     short = sum(1 for w in widths[:-1] if w < 0.68 * max_w)
     if short >= max(1, round(0.34 * (n - 1))):
         return [{"type": "lines", "text": "\n".join(l["text"] for l in lines)}]
 
-    # 5) Ordinary flowing prose
     return [{"type": "p", "text": full}]
 
 
@@ -371,7 +365,6 @@ def _zone_of(y0: float, y1: float, page_h: float, text: str) -> str:
 
 
 def _toc_page_elements(rows: list, body_size: float, page_h: float, prev_toc: bool) -> list:
-    """Build reader elements for a contents page, one entry per visual row."""
     parsed = [(_toc_parts(r["text"]), r) for r in rows]
     matching = [r for p, r in parsed if p]
     any_bold = any(r["bold"] for r in matching)
@@ -399,7 +392,6 @@ def _toc_page_elements(rows: list, body_size: float, page_h: float, prev_toc: bo
         if tag:
             elements.append({"type": tag, "text": r["text"], "y0": r["y0"], "x0": r["x0"], "zone": zone})
         elif zone:
-            # Probably a running header such as "Contents"; filtered later if it repeats
             elements.append({"type": "p", "text": r["text"], "y0": r["y0"], "x0": r["x0"], "zone": zone})
         else:
             elements.append({"type": "toc", "text": r["text"], "page": "",
@@ -443,12 +435,12 @@ def import_pdf(pdf_path: str, force: bool = False) -> dict:
     cover_path = book_dir / "cover.png"
     if len(doc) > 0:
         first_page = doc[0]
-        zoom = 360.0 / max(first_page.rect.width, 1.0)
+        zoom = 300.0 / max(first_page.rect.width, 1.0)
         pix = first_page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
         pix.save(str(cover_path))
 
     body_size = _estimate_body_font_size(doc)
-    dict_flags = fitz.TEXTFLAGS_DICT | fitz.TEXT_PRESERVE_IMAGES  # make sure images are included
+    dict_flags = fitz.TEXTFLAGS_DICT | fitz.TEXT_PRESERVE_IMAGES
 
     raw_items = []
     img_counter = 0
@@ -475,7 +467,6 @@ def import_pdf(pdf_path: str, force: bool = False) -> dict:
                 joined = " ".join(l["text"] for l in lines)
                 if _is_page_number_or_noise(joined):
                     continue
-                # Obvious running headers / footers in the outer margins
                 if (y1 <= hard_head or y0 >= hard_foot) and len(joined) < 110:
                     continue
                 text_blocks.append({
@@ -507,7 +498,6 @@ def import_pdf(pdf_path: str, force: bool = False) -> dict:
                 except Exception:
                     continue
 
-        # ---- Is this a table-of-contents page? ----
         page_elements = []
         all_lines = [l for b in text_blocks for l in b["lines"]]
         page_is_toc = False
@@ -542,7 +532,6 @@ def import_pdf(pdf_path: str, force: bool = False) -> dict:
 
     doc.close()
 
-    # ---- Remove running headers/footers that repeat across pages ----
     zone_pages = defaultdict(set)
     for el in raw_items:
         if el.get("zone") and el["type"] in ("p", "h1", "h2"):
@@ -558,15 +547,14 @@ def import_pdf(pdf_path: str, force: bool = False) -> dict:
             count = len(zone_pages[key])
             if count >= 2:
                 if count >= max(3, 0.25 * total_pages):
-                    continue  # on a big share of pages: definitely a running head
+                    continue
                 if el["type"] == "p":
                     continue
                 if key in seen_keys:
-                    continue  # keep the real heading once, drop its repeats
+                    continue
                 seen_keys.add(key)
         filtered.append(el)
 
-    # ---- Stitch paragraphs split across columns and page boundaries ----
     stitched = []
     for item in filtered:
         if stitched and item["type"] == "p" and stitched[-1]["type"] == "p":
@@ -589,7 +577,6 @@ def import_pdf(pdf_path: str, force: bool = False) -> dict:
     with open(blocks_file, "w", encoding="utf-8") as f:
         json.dump(stitched, f, ensure_ascii=False)
 
-    # Keep the reading position when an old import is re-parsed
     current_block, current_offset, progress_pct = 0, 0.0, 0.0
     if existing:
         old_count = max(int(existing.get("block_count", 0)), 1)

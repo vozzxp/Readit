@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Readit
+GenericName=Book Reader
+Comment=Distraction-free reflowable PDF book reader for GNOME
+Exec=readit %f
+Icon=org.Readit.Readit
+Terminal=false
+Categories=Office;Viewer;Literature;GTK;GNOME;
+MimeType=application/pdf;
+Keywords=pdf;book;reader;ebook;reflow;
+StartupNotify=true
+StartupWMClass=org.Readit.Readit
