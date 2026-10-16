@@ -75,15 +75,10 @@
   function updateKelvinWarmth(warmthVal) {
     const w = Math.max(0, Math.min(100, Number(warmthVal) || 0)) / 100;
     if (w <= 0.005) {
-      document.documentElement.style.setProperty("--warmth-tint", "transparent");
+      document.documentElement.style.setProperty("--warmth-strength", "0");
       return;
     }
-    // Safe CSS gradient tint overlay (computes amber tint without blocking layout/paint)
-    const r = 255;
-    const g = Math.round(255 * (1.0 - w * 0.12));
-    const b = Math.round(255 * (1.0 - w * 0.32));
-    const alpha = (w * 0.16).toFixed(3);
-    document.documentElement.style.setProperty("--warmth-tint", `rgba(${r}, ${g}, ${b}, ${alpha})`);
+    document.documentElement.style.setProperty("--warmth-strength", (w * 0.24).toFixed(3));
   }
 
   // Fast Reading (Lazy Bionic Highlighter)

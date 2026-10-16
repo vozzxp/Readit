@@ -25,8 +25,7 @@
   --reader-max-width: 64ch;
   --reader-saturation: 100%;
 
-  /* Direct CSS Night Light warmth tint (no overlay element to avoid blank screens) */
-  --warmth-tint: transparent;
+  --warmth-strength: 0;
 
   --font-literata: 'Literata', 'IBM Plex Serif', Georgia, serif;
   --font-plex-serif: 'IBM Plex Serif', Georgia, serif;
@@ -127,10 +126,8 @@ html, body {
 #viewport-filter-layer {
   min-height: 100vh;
   background-color: var(--bg-page);
-  /* Safely layers the warm tint and saturation on the background without blocking paint */
-  background-image: linear-gradient(var(--warmth-tint), var(--warmth-tint));
-  filter: saturate(var(--reader-saturation));
-  transition: background-color 180ms ease;
+  filter: sepia(var(--warmth-strength)) saturate(var(--reader-saturation));
+  transition: background-color 180ms ease, filter 180ms ease;
 }
 
 .book-stream {
