@@ -1,6 +1,6 @@
 # Maintainer: voz Readit
 pkgname=readit
-pkgver=1.0.1
+pkgver=1.0.2
 pkgrel=1
 pkgdesc="Distraction-free reflowable PDF book reader for GNOME Wayland"
 arch=('any')
