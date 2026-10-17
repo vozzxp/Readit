@@ -32,7 +32,7 @@ jobs:
 
       - name: Build Debian/Ubuntu Package (.deb)
         run: |
-          PKG_ROOT="dist/deb/readit_1.0.2_all"
+          PKG_ROOT="dist/deb/readit_1.0.3_all"
           mkdir -p "$PKG_ROOT/DEBIAN"
           mkdir -p "$PKG_ROOT/usr/lib/readit/assets"
           mkdir -p "$PKG_ROOT/usr/bin"
@@ -41,7 +41,7 @@ jobs:
 
           cat > "$PKG_ROOT/DEBIAN/control" << 'EOF'
           Package: readit
-          Version: 1.0.2
+          Version: 1.0.3
           Section: text
           Priority: optional
           Architecture: all
@@ -65,7 +65,7 @@ jobs:
           sed -i 's/^          //' "$PKG_ROOT/usr/bin/readit"
           chmod 755 "$PKG_ROOT/usr/bin/readit"
 
-          dpkg-deb --build --root-owner-group "$PKG_ROOT" dist/readit_1.0.2_all.deb
+          dpkg-deb --build --root-owner-group "$PKG_ROOT" dist/readit_1.0.3_all.deb
 
       - name: Upload Linux Build Artifacts
         uses: actions/upload-artifact@v4
@@ -73,7 +73,7 @@ jobs:
           name: readit-linux-packages
           path: |
             dist/readit-linux-x86_64.tar.gz
-            dist/readit_1.0.2_all.deb
+            dist/readit_1.0.3_all.deb
 
       - name: Publish GitHub Release (on version tags)
         if: startsWith(github.ref, 'refs/tags/v')
@@ -81,4 +81,4 @@ jobs:
         with:
           files: |
             dist/readit-linux-x86_64.tar.gz
-            dist/readit_1.0.2_all.deb
+            dist/readit_1.0.3_all.deb

@@ -119,6 +119,8 @@ class ReaditWindow(Adw.ApplicationWindow):
         self.active_book_id = None
         self.webview_ready = False
         self.pending_book_payload = None
+        self.lock_deadline = None  # monotonic µs; None = not locked
+        self._lock_tick_id = None
 
         self._apply_custom_css()
         self._setup_app_icon()
@@ -134,6 +136,7 @@ class ReaditWindow(Adw.ApplicationWindow):
 
         self.connect("notify::fullscreened", self._on_window_state_changed)
         self.connect("notify::maximized", self._on_window_state_changed)
+        self.connect("close-request", self._on_close_request)
 
         self.refresh_library()
 
@@ -168,21 +171,71 @@ class ReaditWindow(Adw.ApplicationWindow):
         self.add_controller(key_ctrl)
 
     def _on_key_pressed(self, controller, keyval, keycode, state):
-        if keyval == Gdk.KEY_Escape and self.root_stack.get_visible_child_name() == "reader":
-            self.close_book_to_library()
-            return True
         if keyval == Gdk.KEY_F11:
             self.toggle_fullscreen()
             return True
         return False
 
+    # ------------------------------------------------------------------
+    # LOCK IN  (no close / back / leaving fullscreen until time is up)
+    # ------------------------------------------------------------------
+    def _is_locked(self) -> bool:
+        return (
+            self.lock_deadline is not None
+            and GLib.get_monotonic_time() < self.lock_deadline
+        )
+
+    def _start_lock(self, seconds: int):
+        seconds = max(1, min(int(seconds), 240 * 60))
+        self.lock_deadline = GLib.get_monotonic_time() + seconds * 1_000_000
+        if not self.is_fullscreen():
+            self.fullscreen()
+        self.present()
+
+        # Ask the compositor to hand us Alt+Tab, Super, etc. instead of
+        # acting on them. GNOME shows a one-time "allow" prompt for this.
+        surface = self.get_surface()
+        if surface is not None and hasattr(surface, "inhibit_system_shortcuts"):
+            surface.inhibit_system_shortcuts(None)
+
+        # Once a second: end the lock on time, and pull the window back
+        # to the front if something still managed to switch away.
+        if self._lock_tick_id:
+            GLib.source_remove(self._lock_tick_id)
+        self._lock_tick_id = GLib.timeout_add(500, self._lock_tick)
+
+    def _lock_tick(self):
+        if not self._is_locked():
+            self._end_lock()
+            return False
+        if not self.is_active() or not self.is_fullscreen():
+            if not self.is_fullscreen():
+                self.fullscreen()
+            self.present()
+        return True
+
+    def _end_lock(self):
+        self.lock_deadline = None
+        self._lock_tick_id = None
+        surface = self.get_surface()
+        if surface is not None and hasattr(surface, "restore_system_shortcuts"):
+            surface.restore_system_shortcuts()
+
+    def _on_close_request(self, _win):
+        # Returning True cancels the close (Alt+F4, window manager, etc.)
+        return self._is_locked()
+
     def toggle_fullscreen(self):
+        if self._is_locked():
+            return
         if self.is_fullscreen():
             self.unfullscreen()
         else:
             self.fullscreen()
 
     def toggle_maximize(self):
+        if self._is_locked():
+            return
         if self.is_fullscreen():
             self.unfullscreen()
         if self.is_maximized():
@@ -665,6 +718,8 @@ class ReaditWindow(Adw.ApplicationWindow):
             self._save_progress_from_msg(msg)
         elif action == "save_settings":
             parser.save_settings(msg.get("settings", {}))
+        elif action == "start_lock":
+            self._start_lock(msg.get("seconds", 300))
         elif action == "close_book":
             self._save_progress_from_msg(msg)
             self.close_book_to_library()
@@ -686,9 +741,12 @@ class ReaditWindow(Adw.ApplicationWindow):
             )
         elif action == "close_app":
             self._save_progress_from_msg(msg)
-            self.close()
+            if not self._is_locked():
+                self.close()
 
     def close_book_to_library(self):
+        if self._is_locked():
+            return
         if self.is_fullscreen():
             self.unfullscreen()
         self.active_book_id = None

@@ -1,0 +1,166 @@
+/* =====================================================================
+   LOCK.CSS  -  "Lock In" (bottom-right corner)
+
+   Two states, swapped by <body data-locked="true|false">:
+     idle   ->  [ 5 min | (Lock In) ]     editable minutes + button
+     locked ->  [ 4:45 min ]              live countdown
+
+   Every size / colour you are likely to tweak is a variable in the
+   first block below.  Change it there and nothing else needs touching.
+   ===================================================================== */
+
+.hotspot-lock {
+  /* ---- tweak here ---- */
+  --lk-height:    44px;                    /* pill height (both states)          */
+  --lk-inset:     4px;                     /* space between pill edge and button */
+  --lk-btn-bg:    var(--panel-border);     /* Lock In button = pill border colour */
+  --lk-timer-bg:  var(--ctl-bg);           /* countdown pill background          */
+  --lk-digits:    var(--text-primary);     /* "5" / "4:45"                       */
+  --lk-unit:      var(--text-muted);       /* "min"                              */
+  --lk-time-size: 15px;                    /* size of the time text              */
+  --lk-btn-size:  12px;                    /* size of the "Lock In" label        */
+  --lk-btn-icon:  13px;                    /* size of the lock icon              */
+
+  right: 0;
+  bottom: 0;
+  width: 300px;
+  height: 84px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+
+/* ---------------------------------------------------------------------
+   Show / hide
+   --------------------------------------------------------------------- */
+.lock-pill,
+.lock-timer {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.hotspot-lock:hover .lock-pill,
+.hotspot-lock:hover .lock-timer,
+.hotspot-lock:focus-within .lock-pill {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+body[data-locked="true"]  .lock-pill  { display: none; }
+body[data-locked="false"] .lock-timer { display: none; }
+
+
+/* ---------------------------------------------------------------------
+   Shared text style (time + unit)
+   --------------------------------------------------------------------- */
+.lock-time,
+.lock-timer {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28em;
+  font: 500 var(--lk-time-size) / 1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.lock-unit {
+  color: var(--lk-unit);
+}
+
+
+/* ---------------------------------------------------------------------
+   State 1: [ 5 min | Lock In ]
+   --------------------------------------------------------------------- */
+.lock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--lk-height);
+  padding: calc(var(--lk-inset) - 1px);      /* -1px = the border */
+  padding-left: 14px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+/* editable minutes */
+.lock-time {
+  cursor: text;
+}
+
+.lock-input {
+  min-width: 1ch;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--lk-digits);
+  font: inherit;
+  text-align: right;
+  caret-color: var(--accent);
+  outline: none;
+}
+
+.lock-time:hover .lock-input,
+.lock-input:focus {
+  color: var(--text-heading);
+}
+
+/* Lock In button */
+.lock-btn {
+  appearance: none;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 14px 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--lk-btn-bg);
+  color: var(--text-heading);
+  font: 500 var(--lk-btn-size) / 1 var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.lock-btn:hover {
+  background: var(--ctl-active);
+}
+
+.lock-btn svg {
+  width: var(--lk-btn-icon);
+  height: var(--lk-btn-icon);
+  flex: none;
+}
+
+
+/* ---------------------------------------------------------------------
+   State 2: [ 4:45 min ]   (no border, no shadow)
+   --------------------------------------------------------------------- */
+.lock-timer {
+  height: var(--lk-height);
+  align-items: center;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--lk-timer-bg);
+  color: var(--lk-digits);
+}
+
+
+/* ---------------------------------------------------------------------
+   While locked, the exit controls are disabled by lock.js.
+   This just keeps the hover tooltip honest.
+   --------------------------------------------------------------------- */
+body[data-locked="true"] #btn-back,
+body[data-locked="true"] #btn-close-app,
+body[data-locked="true"] #btn-fullscreen,
+body[data-locked="true"] #btn-maximize {
+  cursor: not-allowed;
+}

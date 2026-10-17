@@ -1,117 +1,123 @@
-/* Readit extras: 200px smooth scrollbar, page indicator, bookmarks, search bar, edit mode */
+/* =====================================================================
+   EXTRAS.CSS
+   Smooth scrollbar, page indicator, bookmarks, search bar, toast,
+   edit mode.  Everything here is built on the tokens from reader.css.
 
-/* Temporary theme-matched highlight when clicking a bookmark or searching */
+   Load order:  reader.css  ->  extras.css  ->  lock.css
+   ===================================================================== */
+
+
+/* =====================================================================
+   1. HIGHLIGHTS & FLASH
+   Used when jumping to a bookmark or searching.
+   ===================================================================== */
 ::highlight(rd-bm-flash) {
   background-color: var(--ctl-active);
   color: var(--text-heading);
 }
+
 ::highlight(rd-search) {
   background-color: var(--sel-bg);
   color: inherit;
 }
+
 ::highlight(rd-search-active) {
   background-color: var(--accent);
   color: #ffffff;
 }
 
-/* Global typography knobs controlled from edit mode */
-.book-stream p {
-  margin-bottom: var(--rd-pspace, 1.25em);
-  text-indent: var(--rd-pindent, 0em);
-}
-.book-stream .quote-block {
-  padding-left: 1.1em;
-  border-left: 3px solid var(--accent);
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-/* The left pill holds four buttons */
-.hotspot-left { width: 270px; }
-.pill-btn.active { background: var(--accent-soft); color: var(--accent); }
-
 @keyframes rd-flash {
   0%   { background-color: var(--ctl-active); box-shadow: 0 0 0 6px var(--ctl-active); }
-  75%  { background-color: var(--ctl-hover); box-shadow: 0 0 0 4px var(--ctl-hover); }
-  100% { background-color: transparent; box-shadow: 0 0 0 0 transparent; }
-}
-.rd-flash {
-  animation: rd-flash 2.2s ease-out;
-  border-radius: 6px;
+  75%  { background-color: var(--ctl-hover);  box-shadow: 0 0 0 4px var(--ctl-hover); }
+  100% { background-color: transparent;       box-shadow: 0 0 0 0 transparent; }
 }
 
-/* ---------- Bookmarked block hover button (left of first line with margin) ---------- */
+.rd-flash {
+  border-radius: 6px;
+  animation: rd-flash 2.2s ease-out;
+}
+
+
+/* =====================================================================
+   2. BOOKMARKED BLOCK: hover button in the left margin
+   ===================================================================== */
 .book-stream > [data-bm-ids] {
   position: relative;
 }
+
 .rd-inline-unbm {
   position: absolute;
-  left: -38px;
   top: 0.12em;
+  left: -38px;
+  z-index: 20;
   width: 26px;
   height: 26px;
-  border-radius: 8px;
-  border: 1px solid var(--panel-border);
-  background: var(--panel-bg);
-  color: var(--accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+  color: var(--accent);
   cursor: pointer;
   opacity: 0;
-  pointer-events: none;
   transform: translateX(4px);
-  transition: opacity 140ms ease, transform 140ms ease, background-color 120ms ease, color 120ms ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
-  z-index: 20;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease,
+              background-color 120ms ease, color 120ms ease;
 }
-/* Invisible hover bridge so moving the cursor from text to the left button never loses hover */
+
+/* invisible bridge so the cursor never loses hover between text and button */
 .rd-inline-unbm::after {
   content: "";
   position: absolute;
   top: -4px;
+  right: -16px;
   bottom: -4px;
   left: -6px;
-  right: -16px;
 }
+
 .book-stream > [data-bm-ids]:hover .rd-inline-unbm,
 .rd-inline-unbm:hover,
 .rd-inline-unbm:focus-visible {
   opacity: 1;
-  pointer-events: auto;
   transform: translateX(0);
+  pointer-events: auto;
 }
+
 .rd-inline-unbm:hover {
   background: var(--danger-soft);
   border-color: var(--danger);
   color: var(--danger);
 }
 
-/* ---------- Compact 200px Smooth Scrollbar ---------- */
+
+/* =====================================================================
+   3. SCROLLBAR  (200px, fades in on scroll / hover)
+   ===================================================================== */
 .rd-scroll {
   position: fixed;
-  right: 18px;
   top: 50%;
-  bottom: auto;
-  transform: translateY(-50%);
-  height: 200px;
-  max-height: 200px;
-  width: 14px;
-  min-width: 14px;
-  max-width: 14px;
+  right: 18px;
   z-index: 9990;
+  width: 14px;
+  height: 200px;
+  transform: translateY(-50%);
   opacity: 0;
   pointer-events: none;
   user-select: none;
   touch-action: none;
   transition: opacity 200ms ease;
 }
+
 .rd-scroll.awake,
 .rd-scroll:hover,
 .rd-scroll.dragging {
   opacity: 1;
   pointer-events: auto;
 }
+
 .rd-scroll.rd-nope {
   display: none;
 }
@@ -121,8 +127,8 @@
   top: 0;
   bottom: 0;
   left: 50%;
-  transform: translateX(-50%);
   width: 4px;
+  transform: translateX(-50%);
   border-radius: 999px;
   background: var(--panel-border);
   opacity: 0.7;
@@ -141,74 +147,72 @@
   cursor: grab;
   transition: background-color 120ms ease, opacity 120ms ease;
 }
+
+/* bigger invisible grab area */
 .rd-thumb::before {
   content: "";
   position: absolute;
   inset: -4px -8px;
 }
+
 .rd-scroll:hover .rd-thumb,
 .rd-scroll.dragging .rd-thumb {
   background: var(--accent);
   opacity: 1;
 }
+
 .rd-scroll.dragging .rd-thumb {
   cursor: grabbing;
 }
 
+/* bookmark dots on the scrollbar are intentionally hidden */
 .rd-marks {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.rd-mark {
-  position: absolute;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  margin-left: -3px;
-  margin-top: -3px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 1.5px var(--bg-page);
-  cursor: pointer;
-  pointer-events: auto;
+  display: none;
 }
 
+/* page-number tooltip next to the thumb */
 .rd-tip {
   position: absolute;
-  right: 22px;
   top: 0;
+  right: 22px;
   margin-top: -12px;
   padding: 3px 9px;
+  border: 1px solid var(--panel-border);
   border-radius: 8px;
   background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
   color: var(--text-heading);
   font: 600 11.5px var(--font-ui);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
   opacity: 0;
   pointer-events: none;
   transition: opacity 100ms ease;
 }
+
 .rd-tip.show {
   opacity: 1;
 }
 
-/* ---------- Page indicator ---------- */
+
+/* =====================================================================
+   4. PAGE INDICATOR  (bottom-left, click to jump)
+   ===================================================================== */
 .rd-page {
   position: fixed;
-  left: 16px;
   bottom: 14px;
+  left: 16px;
   z-index: 9990;
   font: 500 12px var(--font-ui);
   opacity: 0.55;
   transition: opacity 160ms ease;
 }
-.rd-page:hover, .rd-page.editing { opacity: 1; }
+
+.rd-page:hover,
+.rd-page.editing {
+  opacity: 1;
+}
+
 .rd-page-btn {
   display: inline-flex;
   align-items: center;
@@ -223,23 +227,35 @@
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease;
 }
-.rd-page:hover .rd-page-btn { background: var(--panel-bg); border-color: var(--panel-border); }
-.rd-cur { color: var(--text-heading); }
+
+.rd-page:hover .rd-page-btn {
+  background: var(--panel-bg);
+  border-color: var(--panel-border);
+}
+
+.rd-cur {
+  color: var(--text-heading);
+}
+
 .rd-page-input {
   display: none;
   width: 92px;
   padding: 5px 10px;
-  border-radius: 999px;
   border: 1px solid var(--accent);
+  border-radius: 999px;
   background: var(--panel-bg);
   color: var(--text-heading);
   font: inherit;
   outline: none;
 }
-.rd-page.editing .rd-page-btn { display: none; }
+
+.rd-page.editing .rd-page-btn   { display: none; }
 .rd-page.editing .rd-page-input { display: block; }
 
-/* ---------- Ctrl+F Search Bar ---------- */
+
+/* =====================================================================
+   5. SEARCH BAR  (Ctrl+F)
+   ===================================================================== */
 .rd-search {
   position: fixed;
   top: 16px;
@@ -249,27 +265,30 @@
   align-items: center;
   gap: 4px;
   padding: 5px 8px 5px 11px;
-  background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 999px;
+  background: var(--panel-bg);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
-  font: 12.5px var(--font-ui);
   color: var(--text-primary);
+  font: 12.5px var(--font-ui);
   opacity: 0;
   transform: translateY(-8px) scale(0.98);
   pointer-events: none;
   transition: opacity 140ms ease, transform 140ms ease;
 }
+
 .rd-search.open {
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: auto;
 }
+
 .rd-search-icon {
-  color: var(--text-muted);
   display: inline-flex;
   margin-right: 2px;
+  color: var(--text-muted);
 }
+
 .rd-search-input {
   width: 170px;
   border: none;
@@ -278,59 +297,72 @@
   font: inherit;
   outline: none;
 }
+
 .rd-search-input::placeholder {
   color: var(--text-muted);
 }
+
 .rd-search-count {
+  min-width: 42px;
+  padding: 0 4px;
+  color: var(--text-muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  min-width: 42px;
   text-align: right;
-  padding: 0 4px;
 }
+
 .rd-search-btn {
   width: 24px;
   height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 50%;
   background: transparent;
   color: var(--text-primary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   cursor: pointer;
 }
+
 .rd-search-btn:hover {
   background: var(--ctl-hover);
   color: var(--text-heading);
 }
 
-/* ---------- Bookmarks panel ---------- */
+
+/* =====================================================================
+   6. BOOKMARKS PANEL
+   ===================================================================== */
 .rd-panel {
   position: fixed;
   top: 64px;
   left: 16px;
+  z-index: 10001;
   width: 340px;
   max-width: calc(100vw - 32px);
   max-height: min(70vh, 520px);
   display: flex;
   flex-direction: column;
-  z-index: 10001;
-  background: var(--panel-bg);
+  overflow: hidden;
   border: 1px solid var(--panel-border);
   border-radius: 16px;
+  background: var(--panel-bg);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
-  font: 13px/1.4 var(--font-ui);
   color: var(--text-primary);
-  overflow: hidden;
+  font: 13px/1.4 var(--font-ui);
   opacity: 0;
   transform: translateY(-8px) scale(0.98);
   transform-origin: top left;
   pointer-events: none;
   transition: opacity 150ms ease, transform 150ms ease;
 }
-.rd-panel.open { opacity: 1; transform: none; pointer-events: auto; }
+
+.rd-panel.open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
 .rd-panel-head {
   display: flex;
   align-items: center;
@@ -338,19 +370,42 @@
   padding: 12px 14px;
   border-bottom: 1px solid var(--panel-border);
 }
-.rd-panel-title { font-weight: 600; font-size: 14px; color: var(--text-heading); }
-.rd-count { color: var(--text-muted); font-weight: 500; }
+
+.rd-panel-title {
+  color: var(--text-heading);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rd-count {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
 .rd-add {
+  padding: 5px 11px;
   border: none;
+  border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
   font: 600 12px var(--font-ui);
-  padding: 5px 11px;
-  border-radius: 999px;
   cursor: pointer;
 }
-.rd-list { overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
-.rd-empty { padding: 18px 12px; color: var(--text-muted); text-align: center; }
+
+.rd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.rd-empty {
+  padding: 18px 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .rd-bm {
   display: flex;
   flex-wrap: wrap;
@@ -360,7 +415,11 @@
   border-radius: 10px;
   background: var(--ctl-bg);
 }
-.rd-bm:hover { background: var(--ctl-hover); }
+
+.rd-bm:hover {
+  background: var(--ctl-hover);
+}
+
 .rd-bm-main {
   flex: 1;
   min-width: 0;
@@ -372,16 +431,23 @@
   text-align: left;
   cursor: pointer;
 }
+
 .rd-bm-quote {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-heading);
   font-family: var(--reader-font);
   font-size: 13.5px;
-  color: var(--text-heading);
-  display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  overflow: hidden;
 }
-.rd-bm-meta { margin-top: 3px; font-size: 11px; color: var(--text-muted); }
+
+.rd-bm-meta {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
 .rd-bm-btn {
   width: 26px;
   height: 26px;
@@ -395,101 +461,159 @@
   cursor: pointer;
   opacity: 0;
 }
-.rd-bm:hover .rd-bm-btn { opacity: 1; }
-.rd-bm-btn:hover { background: var(--ctl-active); color: var(--text-heading); }
+
+.rd-bm:hover .rd-bm-btn {
+  opacity: 1;
+}
+
+.rd-bm-btn:hover {
+  background: var(--ctl-active);
+  color: var(--text-heading);
+}
+
 .rd-note {
   flex-basis: 100%;
   margin-top: 4px;
   padding: 6px 10px;
-  border-radius: 8px;
   border: 1px solid var(--accent);
+  border-radius: 8px;
   background: var(--ctl-bg);
   color: var(--text-heading);
   font: inherit;
   outline: none;
 }
 
-/* ---------- Compact Single-Line Toast (Fixed Height Bug) ---------- */
+
+/* =====================================================================
+   7. TOAST  (single line, bottom-centre)
+   ===================================================================== */
 .rd-toast {
   position: fixed;
-  top: auto !important;
+  top: auto !important;   /* keep: an earlier fix for a stretched toast */
   bottom: 28px;
   left: 50%;
-  height: auto;
-  max-height: 38px;
+  z-index: 10002;
   width: max-content;
   max-width: min(360px, calc(100vw - 32px));
-  transform: translate(-50%, 8px);
-  z-index: 10002;
+  max-height: 38px;
   padding: 7px 15px;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
   border-radius: 999px;
   background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
   color: var(--text-heading);
   font: 500 12.5px/1.2 var(--font-ui);
   white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
   opacity: 0;
+  transform: translate(-50%, 8px);
   pointer-events: none;
   transition: opacity 150ms ease, transform 150ms ease;
 }
+
 .rd-toast.show {
   opacity: 1;
   transform: translate(-50%, 0);
 }
 
-/* ---------- Edit mode ---------- */
+
+/* =====================================================================
+   8. EDIT MODE: bottom dock
+   ===================================================================== */
 .rd-dock {
   position: fixed;
-  left: 50%;
   bottom: 14px;
-  width: min(1060px, calc(100vw - 24px));
-  transform: translate(-50%, 16px);
+  left: 50%;
   z-index: 10000;
+  width: min(1060px, calc(100vw - 24px));
   padding: 12px 14px;
+  border: 1px solid var(--panel-border);
   border-radius: 16px;
   background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
-  font: 12.5px/1.3 var(--font-ui);
   color: var(--text-primary);
+  font: 12.5px/1.3 var(--font-ui);
   opacity: 0;
+  transform: translate(-50%, 16px);
   pointer-events: none;
   transition: opacity 160ms ease, transform 160ms ease;
 }
-.rd-dock.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+
+.rd-dock.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
 
 .rd-dock-block {
   display: none;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 16px;
-  padding-bottom: 10px;
   margin-bottom: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--panel-border);
 }
-.rd-dock-block.show { display: flex; }
-.rd-dock-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
-.rd-hint { color: var(--text-muted); margin-right: auto; }
-.rd-group { display: flex; align-items: center; gap: 7px; }
-.rd-glabel { color: var(--text-muted); font-size: 11.5px; }
 
-.rd-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 10px; background: var(--ctl-bg); }
+.rd-dock-block.show {
+  display: flex;
+}
+
+.rd-dock-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.rd-hint {
+  margin-right: auto;
+  color: var(--text-muted);
+}
+
+.rd-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.rd-glabel {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+/* segmented buttons */
+.rd-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--ctl-bg);
+}
+
 .rd-seg button {
+  padding: 5px 9px;
   border: none;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
   font: 500 12px var(--font-ui);
-  padding: 5px 9px;
-  border-radius: 8px;
   cursor: pointer;
 }
-.rd-seg button:hover { color: var(--text-heading); }
+
+.rd-seg button:hover  { color: var(--text-heading); }
 .rd-seg button.active { background: var(--ctl-active); color: var(--text-heading); }
 
-.rd-step { display: inline-flex; align-items: center; background: var(--ctl-bg); border-radius: 9px; padding: 2px; }
+/* - 0.0 + stepper */
+.rd-step {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--ctl-bg);
+}
+
 .rd-step button {
   width: 24px;
   height: 24px;
@@ -500,44 +624,111 @@
   font: 500 15px var(--font-ui);
   cursor: pointer;
 }
-.rd-step button:hover { background: var(--ctl-hover); }
-.rd-val { min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
 
-.rd-actions { gap: 5px; flex-wrap: wrap; }
+.rd-step button:hover {
+  background: var(--ctl-hover);
+}
+
+.rd-val {
+  min-width: 34px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* action buttons */
+.rd-actions {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
 .rd-actions button {
+  padding: 6px 11px;
   border: none;
+  border-radius: 8px;
   background: var(--ctl-bg);
   color: var(--text-heading);
   font: 500 12px var(--font-ui);
-  padding: 6px 11px;
-  border-radius: 8px;
   cursor: pointer;
 }
-.rd-actions button:hover:not(:disabled) { background: var(--ctl-hover); }
-.rd-actions button:disabled { opacity: 0.4; cursor: default; }
-.rd-actions .rd-danger:hover:not(:disabled) { background: rgba(224, 27, 36, 0.85); color: #fff; }
-.rd-actions .rd-primary { background: var(--accent); color: #0b0b0c; font-weight: 600; }
-.rd-actions .rd-primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.1); }
 
-body.rd-editing .sel-popover { display: none !important; }
-body.rd-editing .book-stream { padding-bottom: 34vh; }
-body.rd-editing .book-stream > * { cursor: text; border-radius: 4px; }
-body.rd-editing .book-stream > *:hover { outline: 1px dashed var(--panel-border); outline-offset: 4px; }
-body.rd-editing .book-stream > .rd-sel { outline: 2px solid var(--accent); outline-offset: 4px; }
-body.rd-editing .book-stream .li-text[contenteditable] { outline: none; }
-body.rd-editing .book-stream .rd-sel { caret-color: var(--accent); }
-body.rd-editing .rd-toast { bottom: 190px; }
+.rd-actions button:hover:not(:disabled) {
+  background: var(--ctl-hover);
+}
 
-/* Page-break markers */
-body.rd-editing .book-stream [data-pgstart] { position: relative; }
+.rd-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rd-actions .rd-danger:hover:not(:disabled) {
+  background: rgba(224, 27, 36, 0.85);
+  color: #ffffff;
+}
+
+.rd-actions .rd-primary {
+  background: var(--accent);
+  color: #0b0b0c;
+  font-weight: 600;
+}
+
+.rd-actions .rd-primary:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.1);
+}
+
+
+/* =====================================================================
+   9. EDIT MODE: page tweaks  (body.rd-editing)
+   ===================================================================== */
+body.rd-editing .sel-popover {
+  display: none;
+}
+
+body.rd-editing .book-stream {
+  padding-bottom: 34vh;
+}
+
+body.rd-editing .book-stream > * {
+  border-radius: 4px;
+  cursor: text;
+}
+
+body.rd-editing .book-stream > *:hover {
+  outline: 1px dashed var(--panel-border);
+  outline-offset: 4px;
+}
+
+body.rd-editing .book-stream > .rd-sel {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+body.rd-editing .book-stream .rd-sel {
+  caret-color: var(--accent);
+}
+
+body.rd-editing .book-stream .li-text[contenteditable] {
+  outline: none;
+}
+
+body.rd-editing .rd-toast {
+  bottom: 190px;
+}
+
+/* dashed line + label where a PDF page starts */
+body.rd-editing .book-stream [data-pgstart] {
+  position: relative;
+}
+
 body.rd-editing .book-stream [data-pgstart]::before {
   content: "";
   position: absolute;
-  left: -8px;
-  right: -8px;
   top: -0.8em;
+  right: -8px;
+  left: -8px;
   border-top: 1px dashed var(--panel-border);
 }
+
 body.rd-editing .book-stream [data-pgstart]::after {
   content: "page " attr(data-pgstart);
   position: absolute;
@@ -550,9 +741,56 @@ body.rd-editing .book-stream [data-pgstart]::after {
   letter-spacing: 0.04em;
 }
 
+
+/* =====================================================================
+   10. RESPONSIVE
+   ===================================================================== */
 @media (max-width: 760px) {
   .rd-scroll { right: 8px; }
-  .rd-page { left: 8px; bottom: 8px; }
-  .hotspot-left { width: 220px; }
-  .rd-search { right: 16px; top: 64px; }
+  .rd-page   { left: 8px; bottom: 8px; }
+  .rd-search { top: 64px; right: 16px; }
+}
+
+
+/* =====================================================================
+   11. LEGACY - delete a block if `grep` finds nothing in your .js files:
+       grep -n "rd-hover-unbm" *.js
+       grep -n "rd-bm-temp"    *.js
+   ===================================================================== */
+.rd-hover-unbm {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9995;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: var(--ctl-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.rd-hover-unbm.show {
+  opacity: 0.75;
+  pointer-events: auto;
+}
+
+.rd-hover-unbm:hover {
+  background: var(--ctl-hover);
+  color: var(--text-primary);
+  opacity: 1;
+}
+
+mark.rd-bm-temp {
+  padding: 1px 0;
+  border-radius: 4px;
+  background-color: var(--ctl-active);
+  color: inherit;
 }
