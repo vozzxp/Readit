@@ -1,4 +1,4 @@
-# Maintainer: voz Readit
+# Maintainer: voz
 pkgname=readit
 pkgver=1.0.3
 pkgrel=1
