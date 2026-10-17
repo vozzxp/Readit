@@ -6,7 +6,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path.home() / ".local" / "share" / "readit" / "dictionary.sqlite"
+DB_PATH = Path(__file__).resolve().with_name("dictionary.sqlite")
 
 POS_NAMES = {"n": "noun", "v": "verb", "a": "adjective", "r": "adverb"}
 POS_ABBR = {"n": "n.", "v": "v.", "a": "adj.", "r": "adv."}

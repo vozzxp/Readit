@@ -12,7 +12,7 @@ Usage:
     python3 setup_dictionary.py --no-pron      # skip pronunciations
     python3 setup_dictionary.py --wordnet-dir ~/Downloads/dict   # use files you already have
 
-Output: ~/.local/share/readit/dictionary.sqlite  (about 25-35 MB)
+Output: dictionary.sqlite beside this script  (about 25-35 MB)
 """
 import argparse
 import io
@@ -26,7 +26,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-DB_PATH = Path.home() / ".local" / "share" / "readit" / "dictionary.sqlite"
+DB_PATH = Path(__file__).resolve().with_name("dictionary.sqlite")
 
 WORDNET_URLS = [
     "https://wordnetcode.princeton.edu/3.0/WNdb-3.0.tar.gz",

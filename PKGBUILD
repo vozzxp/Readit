@@ -1,6 +1,6 @@
 # Maintainer: voz Readit
 pkgname=readit
-pkgver=1.0.0
+pkgver=1.0.1
 pkgrel=1
 pkgdesc="Distraction-free reflowable PDF book reader for GNOME Wayland"
 arch=('any')
@@ -21,6 +21,8 @@ package() {
 
   install -m644 "$startdir/main.py" "$pkgdir/usr/lib/readit/main.py"
   install -m644 "$startdir/parser.py" "$pkgdir/usr/lib/readit/parser.py"
+  install -m644 "$startdir/dictionary.py" "$pkgdir/usr/lib/readit/dictionary.py"
+  install -m644 "$startdir/dictionary.sqlite" "$pkgdir/usr/lib/readit/dictionary.sqlite"
   install -m644 "$startdir/assets/reader.html" "$pkgdir/usr/lib/readit/assets/reader.html"
   install -m644 "$startdir/assets/reader.css" "$pkgdir/usr/lib/readit/assets/reader.css"
   install -m644 "$startdir/assets/reader.js" "$pkgdir/usr/lib/readit/assets/reader.js"

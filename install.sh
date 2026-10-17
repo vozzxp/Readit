@@ -11,7 +11,7 @@ ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
 echo "==> Installing Readit to $INSTALL_DIR..."
 mkdir -p "$INSTALL_DIR/assets" "$BIN_DIR" "$APPS_DIR" "$ICON_DIR"
 
-cp "$SRC_DIR/main.py" "$SRC_DIR/parser.py" "$INSTALL_DIR/"
+cp "$SRC_DIR/main.py" "$SRC_DIR/parser.py" "$SRC_DIR/dictionary.py" "$SRC_DIR/dictionary.sqlite" "$INSTALL_DIR/"
 cp -r "$SRC_DIR/assets/"* "$INSTALL_DIR/assets/"
 
 if [ -f "$SRC_DIR/assets/logo.svg" ]; then
