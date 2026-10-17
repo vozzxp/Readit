@@ -15,7 +15,7 @@ except ImportError:
 
 # Bump this whenever the reflow logic changes. Books imported with an older
 # version are re-parsed automatically the next time you open them.
-PARSER_VERSION = 3
+PARSER_VERSION = 4  # v4: every block records its PDF page ("pg")
 
 DATA_DIR = Path.home() / ".local" / "share" / "readit"
 BOOKS_DIR = DATA_DIR / "books"
@@ -98,6 +98,45 @@ def remove_book(book_id: str):
     book_dir = BOOKS_DIR / book_id
     if book_dir.exists():
         shutil.rmtree(book_dir, ignore_errors=True)
+
+
+# ----------------------------------------------------------------------
+# Per-book user data: bookmarks + manual edits (kept apart from the parsed text,
+# so re-parsing a book never wipes your fixes)
+# ----------------------------------------------------------------------
+def _userdata_path(book_id: str) -> Path:
+    return BOOKS_DIR / book_id / "userdata.json"
+
+
+def load_userdata(book_id: str) -> dict:
+    default = {"bookmarks": [], "edits": {}}
+    path = _userdata_path(book_id)
+    if path.exists():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return {
+                    "bookmarks": data.get("bookmarks") if isinstance(data.get("bookmarks"), list) else [],
+                    "edits": data.get("edits") if isinstance(data.get("edits"), dict) else {},
+                }
+        except Exception:
+            pass
+    return default
+
+
+def save_userdata(book_id: str, data: dict):
+    if not book_id or not isinstance(data, dict) or not (BOOKS_DIR / book_id).exists():
+        return
+    clean = {
+        "bookmarks": data.get("bookmarks") if isinstance(data.get("bookmarks"), list) else [],
+        "edits": data.get("edits") if isinstance(data.get("edits"), dict) else {},
+    }
+    path = _userdata_path(book_id)
+    tmp = path.with_suffix(".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(clean, f, ensure_ascii=False)
+    os.replace(tmp, path)
 
 
 def needs_reparse(book: dict) -> bool:
@@ -569,7 +608,9 @@ def import_pdf(pdf_path: str, force: bool = False) -> dict:
                     stitched[-1]["text"] = prev_text + " " + curr_text
                 continue
 
-        stitched.append({k: v for k, v in item.items() if k not in ("y0", "x0", "zone", "_pg")})
+        blk = {k: v for k, v in item.items() if k not in ("y0", "x0", "zone", "_pg")}
+        blk["pg"] = int(item.get("_pg", 0))
+        stitched.append(blk)
 
     for idx, blk in enumerate(stitched):
         blk["id"] = idx
@@ -593,6 +634,7 @@ def import_pdf(pdf_path: str, force: bool = False) -> dict:
         "cover_path": str(cover_path) if cover_path.exists() else "",
         "blocks_file": str(blocks_file),
         "block_count": len(stitched),
+        "page_count": total_pages,
         "parser_version": PARSER_VERSION,
         "current_block": current_block,
         "current_offset": current_offset,

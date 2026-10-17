@@ -15,6 +15,7 @@ gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import Gtk, Adw, WebKit, Gio, GLib, Gdk, GdkPixbuf
 
 import parser
+import dictionary
 
 APP_ID = "org.voz.Readit"
 APP_DIR = Path(__file__).resolve().parent
@@ -118,6 +119,7 @@ class ReaditWindow(Adw.ApplicationWindow):
         self.active_book_id = None
         self.webview_ready = False
         self.pending_book_payload = None
+        self.reader_modal_open = False  # edit mode / panels open in the reader
 
         self._apply_custom_css()
         self._setup_app_icon()
@@ -168,7 +170,13 @@ class ReaditWindow(Adw.ApplicationWindow):
 
     def _on_key_pressed(self, controller, keyval, keycode, state):
         if keyval == Gdk.KEY_Escape and self.root_stack.get_visible_child_name() == "reader":
-            self.close_book_to_library()
+            if self.reader_modal_open:
+                # Let the reader close its own edit mode / panel first
+                self.webview.evaluate_javascript(
+                    "window.ReaditExtras && window.ReaditExtras.escape();", -1, None, None, None, None
+                )
+            else:
+                self.close_book_to_library()
             return True
         if keyval == Gdk.KEY_F11:
             self.toggle_fullscreen()
@@ -511,6 +519,7 @@ class ReaditWindow(Adw.ApplicationWindow):
             "book": book,
             "blocks": blocks,
             "settings": settings,
+            "userdata": parser.load_userdata(book_id),
             "fullscreen": self.is_fullscreen(),
             "maximized": self.is_maximized(),
         }
@@ -539,7 +548,7 @@ class ReaditWindow(Adw.ApplicationWindow):
             self.webview.evaluate_javascript(js_call, -1, None, None, None, None)
 
     # ------------------------------------------------------------------
-    # IN-APP DICTIONARY + FREE AI + GOOGLE AI SEARCH
+    # IN-APP DICTIONARY + GOOGLE AI SEARCH
     # ------------------------------------------------------------------
     def _handle_lookup_selection(self, req_id: int, text: str, context: str, mode: str):
         def worker():
@@ -547,7 +556,7 @@ class ReaditWindow(Adw.ApplicationWindow):
             words = clean_text.split()
             result = {
                 "req_id": req_id,
-                "mode": mode,
+                "mode": "dict",
                 "title": clean_text[:60],
                 "phonetic": "",
                 "badge": "",
@@ -556,58 +565,50 @@ class ReaditWindow(Adw.ApplicationWindow):
                 "error": False,
             }
 
-            headers = {"User-Agent": "ReaditLinuxReader/1.0"}
-
-            if mode == "dict" or (mode == "auto" and len(words) == 1 and len(clean_text) <= 32):
-                word_clean = clean_text.strip(".,!?;:\"'()[]{}").lower()
-                dict_url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{urllib.parse.quote(word_clean)}"
+            # 1) Offline dictionary (instant, private) for 1-2 words
+            if len(words) <= 2 and len(clean_text) <= 40 and dictionary.available():
                 try:
-                    req = urllib.request.Request(dict_url, headers=headers)
-                    with urllib.request.urlopen(req, timeout=5) as resp:
-                        data = json.loads(resp.read().decode("utf-8"))
-                        if isinstance(data, list) and data:
-                            entry = data[0]
-                            result["title"] = entry.get("word", word_clean)
-                            result["phonetic"] = entry.get("phonetic") or ""
-                            meanings = entry.get("meanings") or []
-                            if meanings:
-                                m0 = meanings[0]
-                                result["badge"] = m0.get("partOfSpeech", "word")
-                                defs = m0.get("definitions") or []
-                                lines = []
-                                for idx, d in enumerate(defs[:2], 1):
-                                    lines.append(f"{idx}. {d.get('definition', '')}")
-                                    if not result["example"] and d.get("example"):
-                                        result["example"] = f"“{d.get('example')}”"
-                                result["body"] = "\n".join(lines)
-                                result["mode"] = "dict"
-                                GLib.idle_add(self._send_lookup_result, result)
-                                return
+                    local = dictionary.lookup(clean_text)
                 except Exception:
-                    pass
+                    local = None
+                if local:
+                    result.update(dictionary.format_for_card(local, clean_text))
+                    result["mode"] = "dict"
+                    GLib.idle_add(self._send_lookup_result, result)
+                    return
 
+            # 2) Online dictionary fallback for single/two-word lookups
+            headers = {"User-Agent": "ReaditLinuxReader/1.0"}
+            word_clean = clean_text.strip(".,!?;:\"'()[]{}").lower()
+            dict_url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{urllib.parse.quote(word_clean)}"
             try:
-                prompt = (
-                    f"Explain the meaning of \"{clean_text}\" clearly and concisely in 2 to 3 sentences. "
-                    f"Context from the book: \"{context[:360]}\". "
-                    f"Reply with only the direct explanation, no markdown headers or intro fluff."
-                )
-                ai_url = f"https://text.pollinations.ai/{urllib.parse.quote(prompt)}?model=openai"
-                req = urllib.request.Request(ai_url, headers=headers)
-                with urllib.request.urlopen(req, timeout=9) as resp:
-                    ai_text = resp.read().decode("utf-8").strip()
-                    if ai_text:
-                        result["mode"] = "ai"
-                        result["badge"] = "AI Context Explanation"
-                        result["body"] = ai_text
-                        GLib.idle_add(self._send_lookup_result, result)
-                        return
+                req = urllib.request.Request(dict_url, headers=headers)
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    if isinstance(data, list) and data:
+                        entry = data[0]
+                        result["title"] = entry.get("word", word_clean)
+                        result["phonetic"] = entry.get("phonetic") or ""
+                        meanings = entry.get("meanings") or []
+                        if meanings:
+                            m0 = meanings[0]
+                            result["badge"] = m0.get("partOfSpeech", "word")
+                            defs = m0.get("definitions") or []
+                            lines = []
+                            for idx, d in enumerate(defs[:2], 1):
+                                lines.append(f"{idx}. {d.get('definition', '')}")
+                                if not result["example"] and d.get("example"):
+                                    result["example"] = f"“{d.get('example')}”"
+                            result["body"] = "\n".join(lines)
+                            result["mode"] = "dict"
+                            GLib.idle_add(self._send_lookup_result, result)
+                            return
             except Exception:
                 pass
 
             result["error"] = True
-            result["badge"] = "Offline / Unavailable"
-            result["body"] = "Could not reach the online dictionary or AI service. Click 'Google AI' below to open in your browser."
+            result["badge"] = "No Entry Found"
+            result["body"] = "No dictionary definition found for this selection. Click 'Google' to search in your browser."
             GLib.idle_add(self._send_lookup_result, result)
 
         threading.Thread(target=worker, daemon=True).start()
@@ -622,12 +623,8 @@ class ReaditWindow(Adw.ApplicationWindow):
         return False
 
     def _open_google_ai_query(self, text: str, context: str):
-        clean = text.strip()
-        if len(clean.split()) <= 2:
-            query = f'define "{clean}" meaning and usage'
-        else:
-            query = f'Explain the meaning of "{clean}"'
-        url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+        clean = text.strip()[:2048]
+        url = f"https://www.google.com/search?q={urllib.parse.quote(clean)}"
         try:
             Gio.AppInfo.launch_default_for_uri(url, None)
         except Exception:
@@ -661,6 +658,14 @@ class ReaditWindow(Adw.ApplicationWindow):
             self.toggle_fullscreen()
         elif action == "toggle_maximize":
             self.toggle_maximize()
+        elif action == "save_userdata":
+            if self.active_book_id:
+                try:
+                    parser.save_userdata(self.active_book_id, msg.get("userdata"))
+                except Exception as e:
+                    print("Could not save bookmarks/edits:", e, file=sys.stderr)
+        elif action == "ui_state":
+            self.reader_modal_open = bool(msg.get("modal"))
         elif action == "lookup_selection":
             self._handle_lookup_selection(
                 int(msg.get("req_id", 1)),
@@ -678,6 +683,7 @@ class ReaditWindow(Adw.ApplicationWindow):
             self.close()
 
     def close_book_to_library(self):
+        self.reader_modal_open = False
         if self.is_fullscreen():
             self.unfullscreen()
         self.active_book_id = None

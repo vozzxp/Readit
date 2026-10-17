@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Readit Reader</title>
   <link rel="stylesheet" href="reader.css" />
+  <link rel="stylesheet" href="extras.css" />
 </head>
 <body data-theme="gnome-dark" data-font="literata" data-colorful="false" data-fast="false" data-fullscreen="false" data-maximized="false">
 
@@ -194,7 +195,7 @@
     </div>
   </div>
 
-  <!-- ============ FLOATING SELECTION POPOVER (DICTIONARY + FREE AI + GOOGLE AI) ============ -->
+  <!-- ============ FLOATING SELECTION POPOVER (DEFINE + GOOGLE + BOOKMARK + COPY) ============ -->
   <div id="selection-popover" class="sel-popover" aria-hidden="true">
     <div class="sel-toolbar">
       <button id="btn-sel-dict" class="sel-btn" type="button" title="In-App Dictionary">
@@ -204,24 +205,19 @@
         </svg>
         <span>Define</span>
       </button>
-      <button id="btn-sel-ai" class="sel-btn" type="button" title="Free In-App AI Explanation">
-        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z"></path>
-        </svg>
-        <span>AI Explain</span>
-      </button>
-      <button id="btn-sel-google" class="sel-btn" type="button" title="Open meaning in Google Search AI">
+      <button id="btn-sel-google" class="sel-btn" type="button" title="Search on Google">
         <svg viewBox="0 0 24 24" width="13.5" height="13.5" stroke="currentColor" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <span>Google AI ↗</span>
+        <span>Google ↗</span>
       </button>
-      <button id="btn-sel-copy" class="sel-btn sel-btn-icon" type="button" title="Copy selected text">
+      <button id="btn-sel-copy" class="sel-btn" type="button" title="Copy selected text">
         <svg viewBox="0 0 24 24" width="13.5" height="13.5" stroke="currentColor" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
         </svg>
+        <span>Copy</span>
       </button>
     </div>
 
@@ -244,5 +240,7 @@
   </main>
 
   <script src="reader.js"></script>
+  <script src="readit-core.js"></script>
+  <script src="extras.js"></script>
 </body>
 </html>

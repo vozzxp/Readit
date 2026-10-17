@@ -29,7 +29,6 @@
 
   const selPopover = document.getElementById("selection-popover");
   const btnSelDict = document.getElementById("btn-sel-dict");
-  const btnSelAi = document.getElementById("btn-sel-ai");
   const btnSelGoogle = document.getElementById("btn-sel-google");
   const btnSelCopy = document.getElementById("btn-sel-copy");
   const selCard = document.getElementById("sel-card");
@@ -38,6 +37,8 @@
   const selCardBadge = document.getElementById("sel-card-badge");
   const selCardBody = document.getElementById("sel-card-body");
   const selCardExample = document.getElementById("sel-card-example");
+
+  const GOOGLE_SEARCH_MAX_CHARS = 2048;
 
   let currentBook = null;
   let totalBlocks = 0;
@@ -337,10 +338,26 @@
     }, 300);
   }
 
+  
+  function updateSelectionPopoverOnScroll() {
+    if (!selPopover.classList.contains("open")) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) {
+      hideSelectionPopover();
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    const rects = range.getClientRects();
+    const anchorRect = rects.length ? rects[0] : range.getBoundingClientRect();
+    positionSelectionPopover(anchorRect);
+  }
+
   window.addEventListener(
     "scroll",
     () => {
-      if (selPopover.classList.contains("open")) hideSelectionPopover();
+      if (selPopover.classList.contains("open")) {
+        updateSelectionPopoverOnScroll();
+      }
       if (!scrollRafPending) {
         scrollRafPending = true;
         requestAnimationFrame(computeAndRecordProgress);
@@ -352,15 +369,26 @@
   function hideSelectionPopover() {
     selPopover.classList.remove("open");
     selPopover.setAttribute("aria-hidden", "true");
+    selPopover.style.opacity = "";
+    selPopover.style.pointerEvents = "";
     selCard.hidden = true;
     btnSelDict.classList.remove("active");
-    btnSelAi.classList.remove("active");
   }
 
   function positionSelectionPopover(rect) {
     const popRect = selPopover.getBoundingClientRect();
-    const popW = popRect.width || 290;
-    const popH = popRect.height || 44;
+    const popW = popRect.width || 240;
+    const popH = popRect.height || 42;
+
+    // Hide temporarily only if the selected text is scrolled completely off-screen,
+    // and show it right back as soon as it scrolls back into view
+    if (rect.bottom < 0 || rect.top > window.innerHeight) {
+      selPopover.style.opacity = "0";
+      selPopover.style.pointerEvents = "none";
+      return;
+    }
+    selPopover.style.opacity = "";
+    selPopover.style.pointerEvents = "";
 
     let left = rect.left + rect.width / 2 - popW / 2;
     left = Math.max(12, Math.min(window.innerWidth - popW - 12, left));
@@ -378,8 +406,8 @@
       hideSelectionPopover();
       return;
     }
-    const text = sel.toString().trim();
-    if (text.length < 2 || text.length > 420) {
+    const text = sel.toString().replace(/\s+/g, " ").trim();
+    if (!text) {
       hideSelectionPopover();
       return;
     }
@@ -390,6 +418,14 @@
     }
 
     activeSelectionText = text;
+    const words = text.split(/\s+/).filter(Boolean);
+    const wordCount = words.length;
+
+    // 1-2 words: show Define. >2 words: hide Define.
+    btnSelDict.hidden = wordCount > 2 || text.length > 45;
+    // Very long selection (> max Google Search length): hide Google Search option, keep only Bookmark & Copy.
+    btnSelGoogle.hidden = text.length > GOOGLE_SEARCH_MAX_CHARS;
+
     const blockEl =
       range.commonAncestorContainer.nodeType === 1
         ? range.commonAncestorContainer.closest("[data-block-id]")
@@ -400,29 +436,27 @@
 
     selCard.hidden = true;
     btnSelDict.classList.remove("active");
-    btnSelAi.classList.remove("active");
 
-    const rect = range.getBoundingClientRect();
+    const rects = range.getClientRects();
+    const anchorRect = rects.length ? rects[0] : range.getBoundingClientRect();
     selPopover.classList.add("open");
     selPopover.setAttribute("aria-hidden", "false");
-    requestAnimationFrame(() => positionSelectionPopover(rect));
+    requestAnimationFrame(() => positionSelectionPopover(anchorRect));
   }
 
   streamEl.addEventListener("mouseup", () => setTimeout(handleTextSelection, 20));
   streamEl.addEventListener("keyup", () => setTimeout(handleTextSelection, 20));
 
-  function triggerLookup(mode) {
+  function triggerLookup() {
     if (!activeSelectionText) return;
     lookupReqCounter += 1;
-    btnSelDict.classList.toggle("active", mode === "dict");
-    btnSelAi.classList.toggle("active", mode === "ai");
+    btnSelDict.classList.add("active");
 
     selCard.hidden = false;
     selCardTitle.textContent = activeSelectionText.slice(0, 42);
     selCardPhonetic.textContent = "";
-    selCardBadge.textContent = mode === "dict" ? "Dictionary" : "AI Thinking…";
-    selCardBody.textContent =
-      mode === "dict" ? "Looking up definition…" : "Analyzing meaning in book context…";
+    selCardBadge.textContent = "Dictionary";
+    selCardBody.textContent = "Looking up definition…";
     selCardExample.hidden = true;
 
     const sel = window.getSelection();
@@ -436,12 +470,15 @@
       req_id: lookupReqCounter,
       text: activeSelectionText,
       context: activeSelectionContext,
-      mode,
+      mode: "dict",
     });
   }
 
-  btnSelDict.addEventListener("click", (e) => { e.stopPropagation(); triggerLookup("dict"); });
-  btnSelAi.addEventListener("click", (e) => { e.stopPropagation(); triggerLookup("ai"); });
+  btnSelDict.addEventListener("click", (e) => {
+    e.stopPropagation();
+    triggerLookup();
+  });
+
   btnSelGoogle.addEventListener("click", (e) => {
     e.stopPropagation();
     if (!activeSelectionText) return;
@@ -452,6 +489,7 @@
     });
     hideSelectionPopover();
   });
+
   btnSelCopy.addEventListener("click", (e) => {
     e.stopPropagation();
     if (activeSelectionText && navigator.clipboard) {
@@ -521,7 +559,8 @@
   });
 
   window.addEventListener("keydown", (e) => {
-    if (e.target.matches("input, select, textarea")) return;
+    if (e.target.matches("input, select, textarea") || e.target.isContentEditable) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === "b" || e.key === "B") {
       applySettings({ fast_reading: !settings.fast_reading }, true);
     } else if (e.key === "m" || e.key === "M") {
@@ -619,7 +658,7 @@
       selCard.hidden = false;
       selCardTitle.textContent = res.title || activeSelectionText.slice(0, 42);
       selCardPhonetic.textContent = res.phonetic || "";
-      selCardBadge.textContent = res.badge || (res.mode === "dict" ? "Dictionary" : "AI");
+      selCardBadge.textContent = res.badge || "Dictionary";
       selCardBody.textContent = res.body || "";
       if (res.example) {
         selCardExample.textContent = res.example;
